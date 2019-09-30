@@ -1,19 +1,21 @@
-﻿
+﻿declare let mat4:any;
+declare let mat3:any;
+
 
 /*
     GPGPUのオブジェクトを作ります。
 
     この関数の内部に関数やクラスを入れて外部から参照されないようにします。
 */
-function CreateGPGPU(canvas) {
-    let gl;
+function CreateGPGPU(canvas: HTMLCanvasElement) {
+    let gl : WebGL2RenderingContext;
 
     /*
         エラーのチェックをします。
     */
-    function assert(condition, message) {
+    function assert(condition:boolean, message:string|undefined=undefined) {
         if (!condition) {
-            throw new Error(message || "Assertion failed");
+            throw new Error(message != undefined ? message :"Assertion failed");
         }
     }
 
@@ -24,16 +26,48 @@ function CreateGPGPU(canvas) {
         assert(gl.getError() == gl.NO_ERROR);
     }
 
+    class DrawInf {
+        onDraw() : PackageParameter{
+            return null;
+        }
+    }
+
+    class PackageParameter{
+        id: string;
+        vertexShader: string;
+        fragmentShader: string;
+        args: Map<string, any>;
+        VertexIndexBuffer: any;
+        elementCount: number;
+    }
+
+    class Package{
+        id: string;
+        program: WebGLProgram;
+        transformFeedback: WebGLTransformFeedback;
+        textures: TextureInfo[];
+        attribElementCount: number;
+        elementCount: number;
+        varyings: any[];
+    }
+
     /*
         テクスチャ情報
 
         テクスチャのテクセルの型、サイズ、値の情報を持ちます。
     */
     class TextureInfo {
+        texelType: string;
+        samplerType: string;
+        Texture: WebGLTexture;
+        shape: number[];
+        value: ArrayBufferView;
+        locTexture: WebGLUniformLocation;
+
         /*
             TextureInfoのコンストラクタ
         */
-        constructor(texel_type, shape, value) {
+        constructor(texel_type: string, shape: number[], value) {
             // テクセルの型
             this.texelType = texel_type;
 
@@ -45,15 +79,29 @@ function CreateGPGPU(canvas) {
         }
     }
 
+    class DrawParam{
+        xRot : number;
+        yRot : number;
+        z    : number;
+    }
+
     /*
         GPGPUのメインのクラス
     */
     class GPGPU {
+        canvas: HTMLCanvasElement;
+        TEXTUREs: number[];
+        packages : Map<string, Package>;
+        minFragmentShader: string;
+        defaultFragmentShader: string;
+        textureSphereVertexShader: string;
+        drawObj: DrawInf;
+        drawParam: DrawParam;
 
         /*
             GPGPUのコンストラクタ
         */
-        constructor(canvas) {
+        constructor(canvas: HTMLCanvasElement) {
             console.log("init WebGL");
 
             if (!canvas) {
@@ -73,7 +121,7 @@ function CreateGPGPU(canvas) {
             this.canvas = canvas;
 
             // canvasからWebGL2のcontextを得る。
-            gl = canvas.getContext('webgl2', { antialias: false });
+            gl = canvas.getContext('webgl2', { antialias: false }) as WebGL2RenderingContext;
             var isWebGL2 = !!gl;
             if (!isWebGL2) {
                 // WebGL2のcontextを得られない場合
@@ -85,7 +133,7 @@ function CreateGPGPU(canvas) {
             }
 
             // パッケージのリストを初期化する。
-            this.packages = {};
+            this.packages = new Map<string, Package>();
 
             // 標準のシェーダの文字列をセットする。
             this.setStandardShaderString();
@@ -103,7 +151,7 @@ function CreateGPGPU(canvas) {
         /*
             テクスチャ情報を作ります。
         */
-        makeTextureInfo(texel_type, shape, value) {
+        makeTextureInfo(texel_type: string, shape: number[], value) {
             return new TextureInfo(texel_type, shape, value);
         }
 
@@ -300,7 +348,7 @@ function CreateGPGPU(canvas) {
         /*
             WebGLのプログラムを作ります。
         */
-        makeProgram(vertex_shader, fragment_shader, varyings) {
+        makeProgram(vertex_shader, fragment_shader, varyings) : WebGLProgram {
             // プログラムを作る。
             var prg = gl.createProgram(); chk();
 
@@ -341,7 +389,7 @@ function CreateGPGPU(canvas) {
         /*        
             シェーダを作ります。
         */
-        makeShader(type, source) {
+        makeShader(type, source: string) : WebGLShader {
             source = "#version 300 es\nprecision highp float;\nprecision highp int;\n" + source;
 
             // シェーダを作る。
@@ -446,7 +494,7 @@ function CreateGPGPU(canvas) {
         /*
             テクスチャのデータをセットします。
         */
-        setTextureData(pkg) {
+        setTextureData(pkg: Package) {
             for (var i = 0; i < pkg.textures.length; i++) {
                 var tex_inf = pkg.textures[i];
 
@@ -555,8 +603,8 @@ function CreateGPGPU(canvas) {
         /*
             パッケージを作ります。
         */
-        makePackage(param) {
-            var pkg = {};
+        makePackage(param: PackageParameter) {
+            var pkg = new Package();
             this.packages[param.id] = pkg;
 
             pkg.id = param.id;
@@ -913,13 +961,13 @@ function CreateGPGPU(canvas) {
         /*
             3D表示を開始します。
         */
-        startDraw3D(draw_obj) {
+        startDraw3D(draw_obj: DrawInf) {
             this.drawObj = draw_obj;
             this.drawParam = {
                 xRot : 0,
                 yRot : 0,
                 z    : -5.0
-            }
+            } as DrawParam;
 
             var lastMouseX = null;
             var lastMouseY = null;
