@@ -5,9 +5,9 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Cache-Control" content="no-cache">
 
-<script type="text/javascript" src="../js/gpgpu.js"></script>
 <script type="text/javascript" src="../js/glMatrix-0.9.5.min.js"></script>
-<script type="text/javascript" src="../js/shape.js"></script>
+<script type="text/javascript" src="../js/gpgpu.js?ver=1569883261" ></script>
+<script type="text/javascript" src="../js/shape.js?ver=1569883261" ></script>
 
 <script type="text/javascript">
 class MyDraw {
@@ -34,10 +34,10 @@ class MyDraw {
                 fragmentShader: this.MyWebGL.defaultFragmentShader
                 ,
                 args: {
-                    "VertexPosition": ret.vertex_array,
-                    "VertexNormal": ret.normal_array,
-                    "TextureCoord": ret.texture_array,
-                    "TextureImage": this.MyWebGL.makeTextureInfo(null, null, this.img),
+                    "vertexPosition": ret.vertex_array,
+                    "vertexNormal": ret.normal_array,
+                    "textureCoord": ret.texture_array,
+                    "textureImage": this.MyWebGL.makeTextureInfo(null, null, this.img),
                 }
                 ,
                 VertexIndexBuffer: ret.idx_array

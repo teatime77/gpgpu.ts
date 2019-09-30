@@ -26,7 +26,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
         assert(gl.getError() == gl.NO_ERROR);
     }
 
-    class DrawInf {
+    class Drawable {
         onDraw() : PackageParameter{
             return null;
         }
@@ -45,6 +45,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
         id: string;
         program: WebGLProgram;
         transformFeedback: WebGLTransformFeedback;
+        VertexIndexBufferInf: any;
         textures: TextureInfo[];
         attribElementCount: number;
         elementCount: number;
@@ -95,7 +96,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
         minFragmentShader: string;
         defaultFragmentShader: string;
         textureSphereVertexShader: string;
-        drawObj: DrawInf;
+        drawable: Drawable;
         drawParam: DrawParam;
 
         /*
@@ -168,7 +169,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
         /*
             指定したidのWebGLのオブジェクトをすべて削除します。
         */
-        clear(id) {
+        clear(id: string) {
             var pkg = this.packages[id];
 
             if (pkg) {
@@ -561,11 +562,11 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
             }
         }
 
-        makeVertexIndexBuffer(pkg, param) {
+        makeVertexIndexBuffer(pkg: Package, param: PackageParameter) {
             gl.clearColor(0.0, 0.0, 0.0, 1.0); chk();
             gl.enable(gl.DEPTH_TEST); chk();
 
-            var buf = gl.createBuffer(); chk();
+            var buf : WebGLBuffer = gl.createBuffer(); chk();
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf); chk();
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, param.VertexIndexBuffer, gl.STATIC_DRAW); chk();
 
@@ -760,7 +761,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
         /*
             計算します。
         */
-        compute(param) {
+        compute(param: PackageParameter) {
             var pkg = this.packages[param.id];
             if (!pkg) {
                 // パッケージが未作成の場合
@@ -866,13 +867,13 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
                 const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
 
                 // 位置
-                in vec3 VertexPosition;
+                in vec3 vertexPosition;
 
                 // 法線
-                in vec3 VertexNormal;
+                in vec3 vertexNormal;
 
                 // テクスチャ座標
-                in vec2 TextureCoord;
+                in vec2 textureCoord;
 
                 uniform mat4 uPMVMatrix;
                 uniform mat3 uNMatrix;
@@ -883,14 +884,14 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
 	            out vec2 uv1;
 
                 void main(void) {
-                    gl_Position = uPMVMatrix * vec4(VertexPosition, 1.0);
+                    gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
 
-                    vec3 transformedNormal = uNMatrix * VertexNormal;
+                    vec3 transformedNormal = uNMatrix * vertexNormal;
                     float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
                     vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
 
-		            uv0 = fract( TextureCoord.st );
-		            uv1 = fract( TextureCoord.st + vec2(0.5,0.5) ) - vec2(0.5,0.5);
+		            uv0 = fract( textureCoord.st );
+		            uv1 = fract( textureCoord.st + vec2(0.5,0.5) ) - vec2(0.5,0.5);
                 }
             `;
 
@@ -908,7 +909,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
 	            in vec2 uv0;
 	            in vec2 uv1;
 
-                uniform sampler2D TextureImage;
+                uniform sampler2D textureImage;
 
                 out vec4 color;
 
@@ -918,7 +919,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
 		            uvT.x = ( fwidth( uv0.x ) < fwidth( uv1.x )-0.001 ) ? uv0.x : uv1.x ;
 		            uvT.y = ( fwidth( uv0.y ) < fwidth( uv1.y )-0.001 ) ? uv0.y : uv1.y ;
 
-                    vec4 textureColor = texture(TextureImage, uvT);
+                    vec4 textureColor = texture(textureImage, uvT);
 
                     color = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
                 }
@@ -929,7 +930,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
             3D表示をします。
         */
         drawScene() {
-            var param = this.drawObj.onDraw();
+            var param = this.drawable.onDraw();
 
             var pMatrix = mat4.create();
             mat4.perspective(45, this.canvas.width / this.canvas.height, 0.1, 100.0, pMatrix);
@@ -961,8 +962,8 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
         /*
             3D表示を開始します。
         */
-        startDraw3D(draw_obj: DrawInf) {
-            this.drawObj = draw_obj;
+        startDraw3D(drawable: Drawable) {
+            this.drawable = drawable;
             this.drawParam = {
                 xRot : 0,
                 yRot : 0,
