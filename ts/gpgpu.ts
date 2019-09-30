@@ -45,11 +45,13 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
         id: string;
         program: WebGLProgram;
         transformFeedback: WebGLTransformFeedback;
-        VertexIndexBufferInf: any;
+        vertexIndexBufferInf: any;
         textures: TextureInfo[];
         attribElementCount: number;
         elementCount: number;
-        varyings: any[];
+        varyings: ArgInf[];
+        attributes: ArgInf[];
+        uniforms: ArgInf[];
     }
 
     /*
@@ -78,6 +80,22 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
             // テクスチャの値
             this.value = value;
         }
+    }
+
+    class ArgInf {
+        name: string;
+        value: any;
+        type: string;
+        isArray: boolean;
+        feedbackBuffer: WebGLBuffer;
+        locUniform: WebGLUniformLocation;
+    }
+
+    class Mesh {
+        vertexPosition: Float32Array;
+        vertexNormal: Float32Array;
+        textureCoord: Float32Array;
+        textureImage: TextureInfo;
     }
 
     class DrawParam{
@@ -216,7 +234,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
         /*
             シェーダのソースコードを解析します。
         */
-        parseShader(pkg, param) {
+        parseShader(pkg: Package, param: PackageParameter) {
             // attribute変数、uniform変数、テクスチャ、varying変数の配列を初期化する。
             pkg.attributes = [];
             pkg.uniforms = [];
@@ -320,7 +338,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
                         // テクスチャのsamplerでない場合
 
                         // 変数の名前、値、型、配列かどうかをセットする。
-                        var arg_inf = { name: arg_name, value: arg_val, type: tkn1, isArray: is_array };
+                        var arg_inf = { name: arg_name, value: arg_val, type: tkn1, isArray: is_array } as ArgInf;
 
                         switch (tokens[0]) {
                             case "in":
@@ -570,7 +588,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf); chk();
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, param.VertexIndexBuffer, gl.STATIC_DRAW); chk();
 
-            pkg.VertexIndexBufferInf = {
+            pkg.vertexIndexBufferInf = {
                 value: param.VertexIndexBuffer,
                 buffer: buf
             };
@@ -579,7 +597,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
         /*
             ベクトルの次元を返します。
         */
-        vecDim(tp) {
+        vecDim(tp: string) {
             if (tp == "vec4") {
                 return 4;
             }
@@ -597,7 +615,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
         /*
             ユニフォーム変数のロケーションをセットします。
         */
-        setUniformLocation(pkg) {
+        setUniformLocation(pkg: Package) {
             pkg.uniforms.forEach(u => u.locUniform = gl.getUniformLocation(pkg.program, u.name), chk());
         }
 
@@ -762,7 +780,7 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
             計算します。
         */
         compute(param: PackageParameter) {
-            var pkg = this.packages[param.id];
+            var pkg = this.packages[param.id] as Package;
             if (!pkg) {
                 // パッケージが未作成の場合
 
@@ -797,10 +815,10 @@ function CreateGPGPU(canvas: HTMLCanvasElement) {
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); chk();
 
                 // 頂点インデックスバッファをバインドする。
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.VertexIndexBufferInf.buffer); chk();
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf.buffer); chk();
 
                 // 三角形のリストを描画する。
-                gl.drawElements(gl.TRIANGLES, pkg.VertexIndexBufferInf.value.length, gl.UNSIGNED_SHORT, 0); chk();
+                gl.drawElements(gl.TRIANGLES, pkg.vertexIndexBufferInf.value.length, gl.UNSIGNED_SHORT, 0); chk();
             }
             else {
                 //  描画しない場合
