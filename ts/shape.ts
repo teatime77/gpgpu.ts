@@ -1,7 +1,9 @@
 ﻿// JavaScript source code
 
 class Triangle {
-    constructor(p, q, r, orderd) {
+    Vertexes: Vertex[];
+
+    constructor(p: Vertex, q: Vertex, r: Vertex, orderd: boolean = false) {
         if (orderd == true) {
 
             this.Vertexes = [p, q, r];
@@ -24,6 +26,17 @@ class Triangle {
 }
 
 class Vertex {
+    x: number;
+    y: number;
+    z: number;
+    nx: number;
+    ny: number;
+    nz: number;
+    texX: number;
+    texY: number;
+
+    adjacentVertexes: Vertex[];
+
     constructor(x, y, z) {
         this.x = x;
         this.y = y;
@@ -34,7 +47,9 @@ class Vertex {
 }
 
 class Edge {
-    constructor(p1, p2) {
+    Endpoints: Vertex[];
+
+    constructor(p1: Vertex, p2: Vertex) {
         this.Endpoints = [p1, p2];
     }
 }
@@ -111,11 +126,6 @@ function sprintf() {
     return output;
 }
 
-function println() {
-    var output = sprintf(Array.prototype.slice.call(arguments));
-    console.log(output);
-}
-
 
 function vecLen(p) {
     return Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
@@ -145,7 +155,7 @@ function vecCross(a, b) {
     };
 }
 
-function SetNorm(p) {
+function SetNorm(p: Vertex) {
     var len = vecLen(p);
 
     if (len == 0) {
@@ -345,12 +355,12 @@ function divideTriangle(points, triangles, edges, sphere_r) {
     */
 
 
-    println("半径:%.3f 三角形 %d", sphere_r, triangles.length);
+   console.log(`半径:${sphere_r} 三角形 ${triangles.length}`);
 
     return triangles;
 }
 
-function setTextureCoords(points, sphere_r) {
+function setTextureCoords(points: Vertex[], sphere_r) {
     for (var i = 0; i < points.length; i++) {
         var p = points[i];
         console.assert(i < 12 && p.adjacentVertexes.length == 5 || p.adjacentVertexes.length == 6);
@@ -383,10 +393,10 @@ function setTextureCoords(points, sphere_r) {
 }
 
 function makeEarthBuffers() {
-    var ret = makeRegularIcosahedron();
-    var points = ret.points;
-    var triangles = ret.triangles;
-    var sphere_r = ret.sphere_r;
+    var shape_inf = makeRegularIcosahedron();
+    var points = shape_inf.points;
+    var triangles = shape_inf.triangles;
+    var sphere_r = shape_inf.sphere_r;
 
     var edges = [];
 
@@ -422,7 +432,7 @@ function makeEarthBuffers() {
         textureCoords.push(p.texX, p.texY)
     );
 
-    var ret = {};
+    var ret : any = {};
     ret.vertex_array = new Float32Array(vertices);
     ret.normal_array = new Float32Array(vertexNormals);
     ret.texture_array = new Float32Array(textureCoords);
