@@ -6,8 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-cache">
 
 <script type="text/javascript" src="../js/glMatrix-0.9.5.min.js"></script>
-<script type="text/javascript" src="../js/gpgpu.js?ver=1569885539" ></script>
-<script type="text/javascript" src="../js/shape.js?ver=1569885539" ></script>
+<script type="text/javascript" src="../js/gpgpu.js?ver=1569908092" ></script>
+<script type="text/javascript" src="../js/shape.js?ver=1569908092" ></script>
 
 <script type="text/javascript">
 class MyDraw {
@@ -26,21 +26,14 @@ class MyDraw {
     onDraw() {
         if (!this.param) {
 
-            var ret = makePlaneBuffers(11, 11);
+            var [mesh, idx_array] = gpgpu.makePlaneBuffers(11, 11, new gpgpu.TextureInfo(null, null, this.img));
 
             this.param = {
                 id: "Earth",
                 vertexShader: this.MyWebGL.textureSphereVertexShader,
-                fragmentShader: this.MyWebGL.defaultFragmentShader
-                ,
-                args: {
-                    "vertexPosition": ret.vertex_array,
-                    "vertexNormal": ret.normal_array,
-                    "textureCoord": ret.texture_array,
-                    "textureImage": this.MyWebGL.makeTextureInfo(null, null, this.img),
-                }
-                ,
-                VertexIndexBuffer: ret.idx_array
+                fragmentShader: this.MyWebGL.defaultFragmentShader,
+                args: mesh,
+                VertexIndexBuffer: idx_array
             };
         }
 

@@ -1,4 +1,4 @@
-﻿// JavaScript source code
+﻿namespace gpgpu {
 
 class Triangle {
     Vertexes: Vertex[];
@@ -392,7 +392,7 @@ function setTextureCoords(points: Vertex[], sphere_r) {
     }
 }
 
-function makeEarthBuffers() {
+export function makeEarthBuffers(tex_inv: TextureInfo) {
     var shape_inf = makeRegularIcosahedron();
     var points = shape_inf.points;
     var triangles = shape_inf.triangles;
@@ -432,17 +432,21 @@ function makeEarthBuffers() {
         textureCoords.push(p.texX, p.texY)
     );
 
-    var ret : any = {};
-    ret.vertex_array = new Float32Array(vertices);
-    ret.normal_array = new Float32Array(vertexNormals);
-    ret.texture_array = new Float32Array(textureCoords);
-    ret.idx_array = new Uint16Array(vertexIndices);
 
-    return ret;
+    let mesh = {
+        vertexPosition: new Float32Array(vertices),
+        vertexNormal: new Float32Array(vertexNormals),
+        textureCoord: new Float32Array(textureCoords),
+        textureImage: tex_inv
+    } as Mesh;
+    
+    let idx_array = new Uint16Array(vertexIndices);
+
+    return [mesh, idx_array];
 }
 
 
-function makePlaneBuffers(nx, ny) {
+export function makePlaneBuffers(nx, ny, tex_inv: TextureInfo) {
     // 位置の配列
     var vertices = [];
 
@@ -482,12 +486,17 @@ function makePlaneBuffers(nx, ny) {
         }
     }
 
-    return {
-        vertex_array  : new Float32Array(vertices),
-        normal_array  : new Float32Array(vertexNormals),
-        texture_array : new Float32Array(textureCoords),
-        idx_array     : new Uint16Array(vertexIndices)
-    };
+    let mesh = {
+        vertexPosition: new Float32Array(vertices),
+        vertexNormal: new Float32Array(vertexNormals),
+        textureCoord: new Float32Array(textureCoords),
+        textureImage: tex_inv
+    } as Mesh;
+    
+    let idx_array = new Uint16Array(vertexIndices);
+
+    return [mesh, idx_array];
 }
 
 
+}
