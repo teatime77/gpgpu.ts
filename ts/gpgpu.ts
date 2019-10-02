@@ -28,8 +28,28 @@ function chk() {
 }
 
 export class Drawable {
-    onDraw() : PackageParameter{
-        return null;
+    param: PackageParameter;
+    transform: Float32Array;
+
+    constructor(){
+        this.transform = mat4.create();
+        mat4.identity(this.transform);
+    }
+
+    move(x: number, y: number, z: number) : Drawable {
+        mat4.translate(this.transform, [x, y, z]);
+
+        return this;
+    }
+
+    scale(x: number, y: number, z: number) : Drawable {
+        mat4.scale(this.transform, [x, y, z]);
+
+        return this;
+    }
+    
+    onDraw() {
+        return this.param;
     }
 }
 
@@ -104,6 +124,7 @@ class VertexIndexBufferInf {
 export class Mesh {
     vertexPosition: Float32Array;
     vertexNormal: Float32Array;
+    vertexColor : Float32Array;
     textureCoord: Float32Array;
     textureImage: TextureInfo;
 }
@@ -232,6 +253,52 @@ export class GPGPU {
             color = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
         }
         `;
+
+        static readonly planeVertexShader = `
+
+        const vec3 uAmbientColor = vec3(0.2, 0.2, 0.2);
+        const vec3 uLightingDirection =  normalize( vec3(0.25, 0.25, 1) );
+        const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
+
+        // 位置
+        in vec3 vertexPosition;
+
+        // 法線
+        in vec3 vertexNormal;
+
+        // 色
+        in vec4 vertexColor;
+
+        uniform mat4 uPMVMatrix;
+        uniform mat3 uNMatrix;
+
+        out vec3 vLightWeighting;
+
+        // 色
+        out vec4 fragmentColor;
+
+        void main(void) {
+            gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
+
+            vec3 transformedNormal = uNMatrix * vertexNormal;
+            float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
+            vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
+            fragmentColor = vertexColor;
+        }
+    `;
+
+    static readonly planeFragmentShader =
+        `in vec3 vLightWeighting;
+
+        in vec4 fragmentColor;
+
+        out vec4 color;
+
+        void main(void) {
+            color = vec4(fragmentColor.rgb * vLightWeighting, fragmentColor.a);
+        }
+        `;
+
 
     canvas: HTMLCanvasElement;
     TEXTUREs: number[];
@@ -1008,29 +1075,29 @@ export class GPGPU {
         3D表示をします。
     */
     drawScene() {
-
-        var pMatrix = mat4.create();
-        mat4.perspective(45, this.canvas.width / this.canvas.height, 0.1, 100.0, pMatrix);
-
-        var mvMatrix = mat4.create();
-        mat4.identity(mvMatrix);
-
-        mat4.translate(mvMatrix, [this.drawParam.x, this.drawParam.y, this.drawParam.z]);
-
-        mat4.rotate(mvMatrix, this.drawParam.xRot, [1, 0, 0]);
-        mat4.rotate(mvMatrix, this.drawParam.yRot, [0, 1, 0]);
-
-        var pmvMatrix = mat4.create();
-        mat4.multiply(pMatrix, mvMatrix, pmvMatrix);
-
-        var normalMatrix = mat3.create();
-        mat4.toInverseMat3(mvMatrix, normalMatrix);
-        mat3.transpose(normalMatrix);
-
         // カラーバッファと深度バッファをクリアする。
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); chk();
 
+
         for(let drawable of this.drawables){
+
+            let pMatrix = mat4.create();
+            mat4.perspective(45, this.canvas.width / this.canvas.height, 0.1, 100.0, pMatrix);
+
+            let mvMatrix = mat4.create(drawable.transform);
+            // mat4.identity(mvMatrix);
+
+            mat4.translate(mvMatrix, [this.drawParam.x, this.drawParam.y, this.drawParam.z]);
+
+            mat4.rotate(mvMatrix, this.drawParam.xRot, [1, 0, 0]);
+            mat4.rotate(mvMatrix, this.drawParam.yRot, [0, 1, 0]);
+
+            let pmvMatrix = mat4.create();
+            mat4.multiply(pMatrix, mvMatrix, pmvMatrix);
+
+            let normalMatrix = mat3.create();
+            mat4.toInverseMat3(mvMatrix, normalMatrix);
+            mat3.transpose(normalMatrix);
 
             let param = drawable.onDraw();
 

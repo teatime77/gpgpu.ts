@@ -540,6 +540,103 @@ export function makePlaneBuffers(box: Box, nx: number, ny: number, tex_inv: Text
     return [mesh, idx_array];
 }
 
+export class Color {
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+
+    constructor(r:number, g: number, b: number, a: number){
+        this.r = r;
+        this.g = g;
+        this.b = b;
+        this.a = a;
+    }
+}
+
+export class Circle extends Drawable {
+    constructor(color: Color, numDivision: number){
+        super();
+
+        // 位置の配列
+        let vertices = [];
+    
+        // 法線の配列
+        let vertexNormals = [];
+        
+        // 頂点インデックス
+        let vertexIndices = [];
+        
+        // 円周上の点
+        for(let idx of range(numDivision)){
+            let theta = 2 * Math.PI * idx / numDivision;
+            let x = Math.cos(theta);
+            let y = Math.sin(theta);
+
+            // 位置
+            vertices.push(x, y, 0);
+
+            // 法線
+            vertexNormals.push(0, 0, 1);
+
+            // 三角形の頂点インデックス
+            vertexIndices.push(idx, (idx + 1) % numDivision, numDivision);
+        }
+
+        // 円の中心
+        vertices.push(0, 0, 0);
+        vertexNormals.push(0, 0, 1);
+    
+        // 色の配列
+        let vertexColors = [];
+        range(numDivision + 1).forEach(x => {
+            vertexColors.push(color.r, color.g, color.b, color.a);
+        });
+
+    
+        let mesh = {
+            vertexPosition: new Float32Array(vertices),
+            vertexNormal: new Float32Array(vertexNormals),
+            vertexColor: new Float32Array(vertexColors),
+        } as Mesh;
+            
+        this.param = {
+            id: `label${Label.count++}`,
+            vertexShader: GPGPU.planeVertexShader,
+            fragmentShader: GPGPU.planeFragmentShader,
+            args: mesh,
+            VertexIndexBuffer: new Uint16Array(vertexIndices)
+        } as any as PackageParameter;
+    }
+}
+
+export class Cylinder extends Drawable {
+    constructor(numDivision: number){
+        super();
+
+        // 位置の配列
+        let vertices = [];
+    
+        // 法線の配列
+        let vertexNormals = [];
+        
+        // 頂点インデックス
+        let vertexIndices = [];
+        
+        for(let idx of range(numDivision)){
+            let theta = 2 * Math.PI * idx / numDivision;
+            let x = Math.cos(theta);
+            let y = Math.sin(theta);
+
+            vertices.push(x, y, 1);
+            vertices.push(x, y, -1);
+
+            vertexNormals.push(x, y, 0);
+
+        }
+    }
+}
+
 export class Label extends Drawable {
     static count = 0;
     static texInf: TextureInfo;
@@ -550,7 +647,6 @@ export class Label extends Drawable {
     static readonly fontSize: number = 32;
 
     box : Box;
-    param: PackageParameter;
 
     static initialize(){
         Label.canvas = document.createElement("canvas");
@@ -658,10 +754,6 @@ export class Label extends Drawable {
             VertexIndexBuffer: new Uint16Array(vertexIndices)
         } as any as PackageParameter;
 
-    }
-    
-    onDraw() {
-        return this.param;
     }
 }
 
