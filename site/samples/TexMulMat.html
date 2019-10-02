@@ -111,6 +111,12 @@ function onBodyLoad() {
     document.body.insertAdjacentHTML("beforeend", "<p>A = <br/>" + MatStr(A, 2, 8, true) + "</p>");
     document.body.insertAdjacentHTML("beforeend", "<p>B = <br/>" + MatStr(B, 8, 2, true) + "</p>");
     document.body.insertAdjacentHTML("beforeend", "<p>C = A * B = <br/>" + MatStr(C, 2, 2, true) + "</p>");
+
+    setTimeout(()=>{
+        window.location.href = "TexMulMatVec4.html";
+    },
+    3000);
+
 }
 </script>
 </head>

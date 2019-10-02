@@ -83,6 +83,11 @@
     document.body.insertAdjacentHTML("beforeend", "<p>A = <br/>[" + A.slice(0, 3).join(' ') + "]<br/>[" + A.slice(3, 6).join(' ') + "]</p>");
     document.body.insertAdjacentHTML("beforeend", "<p>B = <br/>" + MatStr(B, 3, 3, false) + "</p>");
     document.body.insertAdjacentHTML("beforeend", "<p>C = B * A = <br/>[" + C.slice(0, 3).join(' ') + "]<br/>[" + C.slice(3, 6).join(' ') + "]</p>");
+
+    setTimeout(()=>{
+        window.location.href = "TexMulMat.html";
+    },
+    3000);
 }
 </script>
 </head>

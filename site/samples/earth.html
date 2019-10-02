@@ -7,8 +7,8 @@
 <meta http-equiv="Cache-Control" content="no-cache">
 
 <script type="text/javascript" src="../js/glMatrix-0.9.5.min.js"></script>
-<script type="text/javascript" src="../js/gpgpu.js?ver=1569908092" ></script>
-<script type="text/javascript" src="../js/shape.js?ver=1569908092" ></script>
+<script type="text/javascript" src="../js/gpgpu.js?ver=1569975438" ></script>
+<script type="text/javascript" src="../js/shape.js?ver=1569975438" ></script>
 
 <script type="text/javascript">
 class MyDraw {
@@ -18,7 +18,7 @@ class MyDraw {
         this.img.onload = function () {
             var canvas = document.getElementById("webgl-canvas");
             this.MyWebGL = CreateGPGPU(canvas);
-            this.MyWebGL.startDraw3D(this);
+            this.MyWebGL.startDraw3D([this]);
         }.bind(this);
 
         this.img.src = "../img/world.topo.bathy.200408.2048x2048.png";
@@ -31,8 +31,8 @@ class MyDraw {
 
             this.param = {
                 id: "Earth",
-                vertexShader: this.MyWebGL.textureSphereVertexShader,
-                fragmentShader: this.MyWebGL.defaultFragmentShader,
+                vertexShader: gpgpu.GPGPU.textureSphereVertexShader,
+                fragmentShader: gpgpu.GPGPU.defaultFragmentShader,
                 args: mesh,
                 VertexIndexBuffer: idx_array
             };
@@ -44,6 +44,7 @@ class MyDraw {
 </script>
 </head>
 <body onload="new MyDraw()">
+    <a href="plane.html">次</a>
     <canvas id="webgl-canvas" style="border: none;" width="500" height="500"></canvas>
 </body>
 </html>

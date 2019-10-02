@@ -27,13 +27,13 @@ function chk() {
     assert(gl.getError() == gl.NO_ERROR);
 }
 
-class Drawable {
+export class Drawable {
     onDraw() : PackageParameter{
         return null;
     }
 }
 
-class PackageParameter{
+export class PackageParameter{
     id: string;
     vertexShader: string;
     fragmentShader: string;
@@ -118,13 +118,75 @@ class DrawParam{
     GPGPUのメインのクラス
 */
 export class GPGPU {
+    static readonly textureSphereVertexShader = `
+
+        const vec3 uAmbientColor = vec3(0.2, 0.2, 0.2);
+        const vec3 uLightingDirection =  normalize( vec3(0.25, 0.25, 1) );
+        const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
+
+        // 位置
+        in vec3 vertexPosition;
+
+        // 法線
+        in vec3 vertexNormal;
+
+        // テクスチャ座標
+        in vec2 textureCoord;
+
+        uniform mat4 uPMVMatrix;
+        uniform mat3 uNMatrix;
+
+        out vec3 vLightWeighting;
+
+        out vec2 uv0;
+        out vec2 uv1;
+
+        void main(void) {
+            gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
+
+            vec3 transformedNormal = uNMatrix * vertexNormal;
+            float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
+            vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
+
+            uv0 = fract( textureCoord.st );
+            uv1 = fract( textureCoord.st + vec2(0.5,0.5) ) - vec2(0.5,0.5);
+        }
+    `;
+
+    // GPGPU用のフラグメントシェーダ。(何も処理はしない。)
+    static readonly minFragmentShader =
+        `out vec4 color;
+
+        void main(){
+            color = vec4(1.0);
+        }`;
+
+    // デフォルトの動作のフラグメントシェーダ
+    static readonly defaultFragmentShader =
+        `in vec3 vLightWeighting;
+        in vec2 uv0;
+        in vec2 uv1;
+
+        uniform sampler2D textureImage;
+
+        out vec4 color;
+
+        void main(void) {
+            vec2 uvT;
+
+            uvT.x = ( fwidth( uv0.x ) < fwidth( uv1.x )-0.001 ) ? uv0.x : uv1.x ;
+            uvT.y = ( fwidth( uv0.y ) < fwidth( uv1.y )-0.001 ) ? uv0.y : uv1.y ;
+
+            vec4 textureColor = texture(textureImage, uvT);
+
+            color = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
+        }
+        `;
+
     canvas: HTMLCanvasElement;
     TEXTUREs: number[];
     packages : Map<string, Package>;
-    minFragmentShader: string;
-    defaultFragmentShader: string;
-    textureSphereVertexShader: string;
-    drawable: Drawable;
+    drawables: Drawable[];
     drawParam: DrawParam;
 
     /*
@@ -643,7 +705,7 @@ export class GPGPU {
             // フラグメントシェーダが指定されてない場合
 
             // デフォルトのフラグメントシェーダをセットする。
-            param.fragmentShader = this.minFragmentShader;
+            param.fragmentShader = GPGPU.minFragmentShader;
         }
 
         // シェーダのソースコードを解析する。
@@ -822,9 +884,6 @@ export class GPGPU {
 
             gl.viewport(0, 0, this.canvas.width, this.canvas.height); chk();
 
-            // カラーバッファと深度バッファをクリアする。
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); chk();
-
             // 頂点インデックスバッファをバインドする。
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf.buffer); chk();
 
@@ -889,77 +948,12 @@ export class GPGPU {
         標準のシェーダの文字列をセットします。
     */
     setStandardShaderString() {
-        this.textureSphereVertexShader = `
-
-            const vec3 uAmbientColor = vec3(0.2, 0.2, 0.2);
-            const vec3 uLightingDirection =  normalize( vec3(0.25, 0.25, 1) );
-            const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
-
-            // 位置
-            in vec3 vertexPosition;
-
-            // 法線
-            in vec3 vertexNormal;
-
-            // テクスチャ座標
-            in vec2 textureCoord;
-
-            uniform mat4 uPMVMatrix;
-            uniform mat3 uNMatrix;
-
-            out vec3 vLightWeighting;
-
-            out vec2 uv0;
-            out vec2 uv1;
-
-            void main(void) {
-                gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
-
-                vec3 transformedNormal = uNMatrix * vertexNormal;
-                float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
-                vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
-
-                uv0 = fract( textureCoord.st );
-                uv1 = fract( textureCoord.st + vec2(0.5,0.5) ) - vec2(0.5,0.5);
-            }
-        `;
-
-        // GPGPU用のフラグメントシェーダ。(何も処理はしない。)
-        this.minFragmentShader =
-            `out vec4 color;
-
-            void main(){
-                color = vec4(1.0);
-            }`;
-
-        // デフォルトの動作のフラグメントシェーダ
-        this.defaultFragmentShader =
-            `in vec3 vLightWeighting;
-            in vec2 uv0;
-            in vec2 uv1;
-
-            uniform sampler2D textureImage;
-
-            out vec4 color;
-
-            void main(void) {
-                vec2 uvT;
-
-                uvT.x = ( fwidth( uv0.x ) < fwidth( uv1.x )-0.001 ) ? uv0.x : uv1.x ;
-                uvT.y = ( fwidth( uv0.y ) < fwidth( uv1.y )-0.001 ) ? uv0.y : uv1.y ;
-
-                vec4 textureColor = texture(textureImage, uvT);
-
-                color = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
-            }
-            `;
     }
 
     /*
         3D表示をします。
     */
     drawScene() {
-        var param = this.drawable.onDraw();
 
         var pMatrix = mat4.create();
         mat4.perspective(45, this.canvas.width / this.canvas.height, 0.1, 100.0, pMatrix);
@@ -979,10 +973,18 @@ export class GPGPU {
         mat4.toInverseMat3(mvMatrix, normalMatrix);
         mat3.transpose(normalMatrix);
 
-        param.args["uPMVMatrix"] = pmvMatrix;
-        param.args["uNMatrix"] = normalMatrix;
+        // カラーバッファと深度バッファをクリアする。
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); chk();
 
-        this.compute(param);
+        for(let drawable of this.drawables){
+
+            let param = drawable.onDraw();
+
+            param.args["uPMVMatrix"] = pmvMatrix;
+            param.args["uNMatrix"] = normalMatrix;
+
+            this.compute(param);
+        }
 
         // 次の再描画でdrawSceneが呼ばれるようにする。
         window.requestAnimationFrame(this.drawScene.bind(this));
@@ -991,8 +993,8 @@ export class GPGPU {
     /*
         3D表示を開始します。
     */
-    startDraw3D(drawable: Drawable) {
-        this.drawable = drawable;
+    startDraw3D(drawables: Drawable[]) {
+        this.drawables = drawables;
         this.drawParam = {
             xRot : 0,
             yRot : 0,
