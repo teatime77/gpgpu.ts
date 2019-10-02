@@ -546,21 +546,21 @@ export class Label extends Drawable {
     static canvas: HTMLCanvasElement;
     static ctx: CanvasRenderingContext2D;
     static chars: string;
-    static readonly cols: number = 16;
-    static readonly fontSize: number = 16;
+    static readonly cols: number = 32;
+    static readonly fontSize: number = 32;
 
     box : Box;
     param: PackageParameter;
 
     static initialize(){
         Label.canvas = document.createElement("canvas");
-        Label.canvas.width = 256;
-        Label.canvas.height = 256;
+        Label.canvas.width = Label.cols * Label.fontSize;
+        Label.canvas.height = Label.cols * Label.fontSize;
 
         window.document.body.appendChild(Label.canvas);
 
         Label.ctx = Label.canvas.getContext('2d');
-        Label.ctx.font = "16px monospace";
+        Label.ctx.font = `${Label.fontSize}px monospace`;
         Label.ctx.textBaseline = "top";
 
         Label.chars = "";
@@ -578,8 +578,25 @@ export class Label extends Drawable {
 
         this.box = box;
 
+        const textHalfCols = range(text.length).map(i => (text.charCodeAt(i) < 256 ? 1 : 2) as number).reduce((x,y)=>x+y);
+        const halfColWidth = box.width / textHalfCols;
 
-        for(let ch of text){
+        // 位置の配列
+        let vertices = [];
+    
+        // 法線の配列
+        let vertexNormals = [];
+    
+        // テクスチャ座標
+        let textureCoords = [];
+    
+        // 頂点インデックス
+        let vertexIndices = [];
+    
+        let posX = this.box.x1;
+        for(let [j, ch] of Array.from(text).entries()){
+            let halfFull = (ch.charCodeAt(0) < 256 ? 1 : 2);
+
             let char_idx = Label.chars.indexOf(ch);
             let new_char = (char_idx == -1)
             if(char_idx == -1){
@@ -595,82 +612,57 @@ export class Label extends Drawable {
 
                 Label.ctx.fillText(ch, Label.fontSize * ix, Label.fontSize * iy);
             }
-        }
 
+            let idx = vertices.length / 3;
+            console.assert(vertices.length % 3 == 0);
+            for(let i2 = 0; i2 < 2; i2++){
+                for(let j2 = 0; j2 < 2; j2++){
 
-        var [mesh, idx_array] = this.makeBuffers(text, new gpgpu.TextureInfo(null, null, Label.canvas));
+                    vertices.push(posX + j2 * halfFull * halfColWidth, this.box.y1 + i2 * this.box.height, 0);
+                    vertexNormals.push(0, 0, 1);
 
-        this.param = {
-            id: `label${Label.count++}`,
-            vertexShader: gpgpu.GPGPU.textureSphereVertexShader,
-            fragmentShader: gpgpu.GPGPU.defaultFragmentShader,
-            args: mesh,
-            VertexIndexBuffer: idx_array
-        } as any as PackageParameter;
-
-
-    }
-
-    makeBuffers(text: string, tex_inv: TextureInfo) {
-        const nx: number = 14;//text.length;
-        const ny: number = 5;
-
-        // 位置の配列
-        var vertices = [];
-    
-        // 法線の配列
-        var vertexNormals = [];
-    
-        // テクスチャ座標
-        var textureCoords = [];
-    
-        // 頂点インデックス
-        var vertexIndices = [];
-    
-        const dx = this.box.width  / (nx - 1);
-        const dy = this.box.height / (ny - 1)
-        for (var i = 0; i < ny; i++) {
-            var y = i / (ny - 1);
-            for (var j = 0; j < nx; j++) {
-                var x = j / (nx - 1);
-    
-                vertices.push(this.box.x1 + j * dx, this.box.y1 + i * dy, 0);
-                vertexNormals.push(0, 0, 1);
-                textureCoords.push(x, y);
-
-                if(i < ny - 1 && j < nx - 1){
-                    var i00 =  i      * nx + j;
-                    var i01 =  i      * nx + j + 1;
-                    var i10 = (i + 1) * nx + j;
-                    var i11 = (i + 1) * nx + j + 1;
-                    var cnt = vertices.length / 3;
-                    if(cnt <= i00 || cnt <= i01 || cnt <= i10 || cnt <= i11){
-                        console.log("");
-                    }
-        
-                    vertexIndices.push(i00, i10, i01);
-                    vertexIndices.push(i01, i10, i11);
+                    let x = (ix + j2 * halfFull / 2) / Label.cols;
+                    let y = (Label.cols - 1 - iy + i2) / Label.cols;
+                    textureCoords.push(x , y);
                 }
             }
+
+            let i00 = idx;
+            let i01 = idx + 1;
+            let i10 = idx + 2;
+            let i11 = idx + 3;
+            let cnt = vertices.length / 3;
+            if(cnt <= i00 || cnt <= i01 || cnt <= i10 || cnt <= i11){
+                console.log("");
+            }
+
+            vertexIndices.push(i00, i10, i01);
+            vertexIndices.push(i01, i10, i11);
+
+            posX += halfFull * halfColWidth;
         }
     
         let mesh = {
             vertexPosition: new Float32Array(vertices),
             vertexNormal: new Float32Array(vertexNormals),
             textureCoord: new Float32Array(textureCoords),
-            textureImage: tex_inv
+            textureImage: new gpgpu.TextureInfo(null, null, Label.canvas)
         } as Mesh;
         
-        let idx_array = new Uint16Array(vertexIndices);
     
-        return [mesh, idx_array];
+        this.param = {
+            id: `label${Label.count++}`,
+            vertexShader: gpgpu.GPGPU.planeTextureVertexShader,//.textureSphereVertexShader,
+            fragmentShader: gpgpu.GPGPU.planeTextureFragmentShader,//defaultFragmentShader,
+            args: mesh,
+            VertexIndexBuffer: new Uint16Array(vertexIndices)
+        } as any as PackageParameter;
+
     }
     
     onDraw() {
         return this.param;
     }
 }
-
-
 
 }

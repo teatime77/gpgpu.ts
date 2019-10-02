@@ -111,6 +111,8 @@ export class Mesh {
 class DrawParam{
     xRot : number;
     yRot : number;
+    x    : number;
+    y    : number;
     z    : number;
 }
 
@@ -178,6 +180,54 @@ export class GPGPU {
             uvT.y = ( fwidth( uv0.y ) < fwidth( uv1.y )-0.001 ) ? uv0.y : uv1.y ;
 
             vec4 textureColor = texture(textureImage, uvT);
+
+            color = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
+        }
+        `;
+
+        static readonly planeTextureVertexShader = `
+
+        const vec3 uAmbientColor = vec3(0.2, 0.2, 0.2);
+        const vec3 uLightingDirection =  normalize( vec3(0.25, 0.25, 1) );
+        const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
+
+        // 位置
+        in vec3 vertexPosition;
+
+        // 法線
+        in vec3 vertexNormal;
+
+        // テクスチャ座標
+        in vec2 textureCoord;
+
+        uniform mat4 uPMVMatrix;
+        uniform mat3 uNMatrix;
+
+        out vec3 vLightWeighting;
+
+        out vec2 uv;
+
+        void main(void) {
+            gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
+
+            vec3 transformedNormal = uNMatrix * vertexNormal;
+            float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
+            vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
+
+            uv = textureCoord;
+        }
+    `;
+
+    static readonly planeTextureFragmentShader =
+        `in vec3 vLightWeighting;
+        in vec2 uv;
+
+        uniform sampler2D textureImage;
+
+        out vec4 color;
+
+        void main(void) {
+            vec4 textureColor = texture(textureImage, uv);
 
             color = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
         }
@@ -560,20 +610,24 @@ export class GPGPU {
             gl.bindTexture(dim, tex_inf.Texture); chk();
 
             if (tex_inf.value instanceof HTMLImageElement || tex_inf.value instanceof HTMLCanvasElement) {
-                // テクスチャが画像の場合
+                // テクスチャが画像やキャンバスの場合
 
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); chk();
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST); chk();
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); chk();    // LINEAR_MIPMAP_NEAREST
 
-                //        gl.texParameteri(gl.TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_MIRRORED_REPEAT); //GL_REPEAT
-                //        gl.texParameteri(gl.TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_MIRRORED_REPEAT); //GL_REPEAT
+                if(tex_inf.value instanceof HTMLCanvasElement){
 
-                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); chk();
+                }
+                else{
+
+                    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); chk();
+                }
+
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tex_inf.value); chk();
                 gl.generateMipmap(gl.TEXTURE_2D); chk();
             }
             else {
-                // テクスチャが画像でない場合
+                // テクスチャが画像やキャンバスでない場合
 
                 gl.texParameteri(dim, gl.TEXTURE_MAG_FILTER, gl.NEAREST); chk();
                 gl.texParameteri(dim, gl.TEXTURE_MIN_FILTER, gl.NEAREST); chk();
@@ -961,7 +1015,7 @@ export class GPGPU {
         var mvMatrix = mat4.create();
         mat4.identity(mvMatrix);
 
-        mat4.translate(mvMatrix, [0.0, 0.0, this.drawParam.z]);
+        mat4.translate(mvMatrix, [this.drawParam.x, this.drawParam.y, this.drawParam.z]);
 
         mat4.rotate(mvMatrix, this.drawParam.xRot, [1, 0, 0]);
         mat4.rotate(mvMatrix, this.drawParam.yRot, [0, 1, 0]);
@@ -998,6 +1052,8 @@ export class GPGPU {
         this.drawParam = {
             xRot : 0,
             yRot : 0,
+            x    : 0,
+            y    : 0,
             z    : -5.0
         } as DrawParam;
 
@@ -1005,27 +1061,35 @@ export class GPGPU {
         var lastMouseY = null;
 
         // mousemoveのイベント リスナーを登録する。
-        this.canvas.addEventListener('mousemove', function (event) {
-            var newX = event.clientX;
-            var newY = event.clientY;
+        this.canvas.addEventListener('mousemove', (ev: MouseEvent)=> {
+            var newX = ev.clientX;
+            var newY = ev.clientY;
 
-            if (event.buttons != 0 && lastMouseX != null) {
+            if (ev.buttons != 0 && lastMouseX != null) {
 
-                this.drawParam.xRot += (newY -lastMouseY) / 300;
-                this.drawParam.yRot += (newX - lastMouseX) / 300;
+                if(ev.shiftKey){
+
+                    this.drawParam.x += (newX - lastMouseX) / 300;
+                    this.drawParam.y -= (newY - lastMouseY) / 300;
+                }
+                else{
+
+                    this.drawParam.xRot += (newY -lastMouseY) / 300;
+                    this.drawParam.yRot += (newX - lastMouseX) / 300;
+                }
             }
 
             lastMouseX = newX
             lastMouseY = newY;
-        }.bind(this));
+        });
 
         // touchmoveのイベント リスナーを登録する。
-        this.canvas.addEventListener('touchmove', function (event) {
+        this.canvas.addEventListener('touchmove', (ev: TouchEvent)=> {
             // タッチによる画面スクロールを止める
-            event.preventDefault(); 
+            ev.preventDefault(); 
 
-            var newX = event.changedTouches[0].clientX;
-            var newY = event.changedTouches[0].clientY;
+            var newX = ev.changedTouches[0].clientX;
+            var newY = ev.changedTouches[0].clientY;
 
             if (lastMouseX != null) {
 
@@ -1035,15 +1099,15 @@ export class GPGPU {
 
             lastMouseX = newX
             lastMouseY = newY;
-        }.bind(this), false);
+        }, false);
 
         // wheelのイベント リスナーを登録する。
-        this.canvas.addEventListener("wheel", function (e) {
-            this.drawParam.z += 0.02 * e.deltaY;
+        this.canvas.addEventListener("wheel",  (ev: WheelEvent)=> {
+            this.drawParam.z += 0.02 * ev.deltaY;
 
             // ホイール操作によるスクロールを無効化する
-            e.preventDefault();
-        }.bind(this));
+            ev.preventDefault();
+        });
 
         // 3D表示をする。
         this.drawScene();
