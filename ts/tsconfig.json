@@ -9,6 +9,7 @@
     }
     ,
     "exclude": [
+        "未使用.ts",
         "make_rst.ts",
         "MersenneTwister.ts",
         "MNIST.ts",

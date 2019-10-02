@@ -540,83 +540,34 @@ export function makePlaneBuffers(box: Box, nx: number, ny: number, tex_inv: Text
     return [mesh, idx_array];
 }
 
-export class Label2 {
-    canvas_2d;
-    box : Box;
-    param: PackageParameter;
-
-    constructor(text2: string, box: Box){
-        this.box = box;
-        this.canvas_2d = document.getElementById("canvas-2d");
-        let ctx = this.canvas_2d.getContext('2d');
-        ctx.font = "16px monospace";
-        ctx.textBaseline = "top";
-
-        let text = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()=+-*/~|@;:,.[]{}";
-        text += "あいうえおかきくけこさしすせそたちつてとなにぬねの";
-
-        for(let y = 0; y < 16; y++){
-            let base = 16 * y;
-            if(text.length <= base){
-                break;
-            }
-            let s = text.substring(base, base + 16);
-            s = gpgpu.range(s.length).map(i => s.charCodeAt(i) < 256 ? s[i] + " " : s[i]).join("");
-            ctx.fillText(s, 0, 16 * y);
-        }
-    }
-
-    onDraw() {
-        if (!this.param) {
-
-            var [mesh, idx_array] = gpgpu.makePlaneBuffers(this.box, 11, 11, new gpgpu.TextureInfo(null, null, this.canvas_2d));
-
-            this.param = {
-                id: "label",
-                vertexShader: gpgpu.GPGPU.textureSphereVertexShader,
-                fragmentShader: gpgpu.GPGPU.defaultFragmentShader,
-                args: mesh,
-                VertexIndexBuffer: idx_array
-            } as any as PackageParameter;
-        }
-
-        return this.param;
-    }
-}
-
-
 export class Label extends Drawable {
     static count = 0;
     static texInf: TextureInfo;
+    static canvas: HTMLCanvasElement;
     static ctx: CanvasRenderingContext2D;
     static chars: string;
     static readonly cols: number = 16;
     static readonly fontSize: number = 16;
 
-    box: Box;
-    mesh: Mesh;
-    idx_array: Uint16Array;
+    box : Box;
     param: PackageParameter;
 
     static initialize(){
+        Label.canvas = document.createElement("canvas");
+        Label.canvas.width = 256;
+        Label.canvas.height = 256;
 
-        const canvas = document.createElement("canvas");
-        canvas.width = 256;
-        canvas.height = 256;
+        window.document.body.appendChild(Label.canvas);
 
-        window.document.body.appendChild(canvas);
-
-        // const canvas = document.getElementById("canvas-2d") as HTMLCanvasElement;
-
-        Label.ctx = canvas.getContext('2d');
+        Label.ctx = Label.canvas.getContext('2d');
         Label.ctx.font = "16px monospace";
         Label.ctx.textBaseline = "top";
 
         Label.chars = "";
 
-        Label.texInf = new TextureInfo(null, null, canvas);
+        Label.texInf = new TextureInfo(null, null, Label.canvas);
     }
-    
+
     constructor(text: string, box: Box){
         super();
 
@@ -627,21 +578,7 @@ export class Label extends Drawable {
 
         this.box = box;
 
-        // 位置の配列
-        let vertices = [];
 
-        // 法線の配列
-        let vertexNormals = [];
-
-        // テクスチャ座標
-        let textureCoords = [];
-
-        // 頂点インデックス
-        let vertexIndices = [];
-
-        const text_cols = range(text.length).map(i => (text.charCodeAt(i) < 256 ? 1 : 2) as number).reduce((x,y) => x + y);
-        const colW = box.width / text_cols;
-        let col = 0;
         for(let ch of text){
             let char_idx = Label.chars.indexOf(ch);
             let new_char = (char_idx == -1)
@@ -658,68 +595,82 @@ export class Label extends Drawable {
 
                 Label.ctx.fillText(ch, Label.fontSize * ix, Label.fontSize * iy);
             }
-
-            // if(ch != text[0]){
-            //     continue;
-            // }
-
-            let char_cols = (ch.charCodeAt(0) < 256 ? 1 : 2);
-
-            let vertex_idx = vertices.length / 3;
-
-
-            let xs = []
-            for (let i = 0; i < 2; i++) {
-                for (let j = 0; j < 2; j++) {
-
-                    // vertices.push(box.x1 + (col + j * char_cols/2) * colW, box.y1 + i * box.height, box.z1);
-                    vertices.push(box.x1 + j * box.width, box.y1 + i * box.height, 0);
-                    vertexNormals.push(0, 0, 1);
-
-                    let texY = (iy + i) / Label.cols;
-                    let texX = (ix + j * char_cols /2 ) / Label.cols;
-
-                    // textureCoords.push(texX, texY);
-                    textureCoords.push(j, i);
-                }
-            }
-
-            let i00 = vertex_idx;
-            let i01 = vertex_idx + 1;
-            let i10 = vertex_idx + 2;
-            let i11 = vertex_idx + 3;
-
-            vertexIndices.push(i00, i10, i01);
-            vertexIndices.push(i01, i10, i11);
-
-            col += char_cols;
         }
 
-        this.mesh = {
+
+        var [mesh, idx_array] = this.makeBuffers(text, new gpgpu.TextureInfo(null, null, Label.canvas));
+
+        this.param = {
+            id: `label${Label.count++}`,
+            vertexShader: gpgpu.GPGPU.textureSphereVertexShader,
+            fragmentShader: gpgpu.GPGPU.defaultFragmentShader,
+            args: mesh,
+            VertexIndexBuffer: idx_array
+        } as any as PackageParameter;
+
+
+    }
+
+    makeBuffers(text: string, tex_inv: TextureInfo) {
+        const nx: number = 14;//text.length;
+        const ny: number = 5;
+
+        // 位置の配列
+        var vertices = [];
+    
+        // 法線の配列
+        var vertexNormals = [];
+    
+        // テクスチャ座標
+        var textureCoords = [];
+    
+        // 頂点インデックス
+        var vertexIndices = [];
+    
+        const dx = this.box.width  / (nx - 1);
+        const dy = this.box.height / (ny - 1)
+        for (var i = 0; i < ny; i++) {
+            var y = i / (ny - 1);
+            for (var j = 0; j < nx; j++) {
+                var x = j / (nx - 1);
+    
+                vertices.push(this.box.x1 + j * dx, this.box.y1 + i * dy, 0);
+                vertexNormals.push(0, 0, 1);
+                textureCoords.push(x, y);
+
+                if(i < ny - 1 && j < nx - 1){
+                    var i00 =  i      * nx + j;
+                    var i01 =  i      * nx + j + 1;
+                    var i10 = (i + 1) * nx + j;
+                    var i11 = (i + 1) * nx + j + 1;
+                    var cnt = vertices.length / 3;
+                    if(cnt <= i00 || cnt <= i01 || cnt <= i10 || cnt <= i11){
+                        console.log("");
+                    }
+        
+                    vertexIndices.push(i00, i10, i01);
+                    vertexIndices.push(i01, i10, i11);
+                }
+            }
+        }
+    
+        let mesh = {
             vertexPosition: new Float32Array(vertices),
             vertexNormal: new Float32Array(vertexNormals),
             textureCoord: new Float32Array(textureCoords),
-            textureImage: Label.texInf
+            textureImage: tex_inv
         } as Mesh;
         
-        this.idx_array = new Uint16Array(vertexIndices);
+        let idx_array = new Uint16Array(vertexIndices);
+    
+        return [mesh, idx_array];
     }
     
-    onDraw() : PackageParameter{
-        if (!this.param) {
-
-            this.param = {
-                id: `label${Label.count++}`,
-                vertexShader: GPGPU.textureSphereVertexShader,
-                fragmentShader: GPGPU.defaultFragmentShader,
-                args: this.mesh,
-                VertexIndexBuffer: this.idx_array
-            } as any as PackageParameter;
-        }
-
+    onDraw() {
         return this.param;
     }
-
 }
+
+
 
 }
