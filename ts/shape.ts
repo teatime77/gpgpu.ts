@@ -65,10 +65,34 @@ class Triangle {
     }
 }
 
-class Vertex {
+class Vec3 {
     x: number;
     y: number;
     z: number;
+
+    constructor(x, y, z){
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+
+    len(){
+        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    }
+
+    unit() : Vec3 {
+        const len = this.len();
+
+        if(len == 0){
+            return new Vec3(0, 0, 0);
+        }
+        else{
+            return new Vec3(this.x / len, this.y / len, this.z / len);
+        }
+    }
+}
+
+class Vertex extends Vec3 {
     nx: number;
     ny: number;
     nz: number;
@@ -78,10 +102,7 @@ class Vertex {
     adjacentVertexes: Vertex[];
 
     constructor(x, y, z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-
+        super(x, y, z);
         this.adjacentVertexes = [];
     }
 }
@@ -211,7 +232,7 @@ function SetNorm(p: Vertex) {
     }
 }
 
-function makeRegularIcosahedron() {
+function makeRegularIcosahedron() : [ Vertex[], Triangle[], number ] {
     var G = (1 + Math.sqrt(5)) / 2;
 
     // 頂点のリスト
@@ -263,7 +284,7 @@ function makeRegularIcosahedron() {
 
 
     // 三角形のリスト
-    var triangles = []
+    var triangles : Triangle[] = []
 
     for (var i1 = 0; i1 < points.length; i1++) {
         for (var i2 = i1 + 1; i2 < points.length; i2++) {
@@ -297,7 +318,7 @@ function makeRegularIcosahedron() {
         console.assert(p.adjacentVertexes.length == 5);
     });
 
-    return { points: points, triangles: triangles, sphere_r: sphere_r };
+    return [ points, triangles, sphere_r ];
 }
 
 function divideTriangle(points, triangles, edges, sphere_r) {
@@ -433,10 +454,7 @@ function setTextureCoords(points: Vertex[], sphere_r) {
 }
 
 export function makeEarthBuffers(tex_inv: TextureInfo) {
-    var shape_inf = makeRegularIcosahedron();
-    var points = shape_inf.points;
-    var triangles = shape_inf.triangles;
-    var sphere_r = shape_inf.sphere_r;
+    let [ points, triangles, sphere_r ] = makeRegularIcosahedron();
 
     var edges = [];
 
@@ -658,6 +676,49 @@ export class Circle extends Drawable {
         let mesh = {
             vertexPosition: new Float32Array(vertices),
             vertexNormal: new Float32Array(vertexNormals),
+            vertexColor: new Float32Array(vertexColors),
+        } as Mesh;
+            
+        this.param = {
+            id: `${this.constructor.name}.${Drawable.count++}`,
+            vertexShader: GPGPU.planeVertexShader,
+            fragmentShader: GPGPU.planeFragmentShader,
+            args: mesh,
+            VertexIndexBuffer: new Uint16Array(vertexIndices)
+        } as any as PackageParameter;
+    }
+}
+
+export class RegularIcosahedron extends Drawable {
+    constructor(color: Color){
+        super();
+
+        let [ points, triangles, sphere_r ] = makeRegularIcosahedron();
+
+        const positions : number[] = [];
+        const normals : number[] = [];
+        points.forEach(p =>  {
+            positions.push(p.x, p.y, p.z);
+
+            let n = p.unit();
+            normals.push(n.x, n.y, n.z);
+        });
+
+        const vertexIndices : number[] = [];
+        triangles.forEach(tri => {
+            for(let v of tri.Vertexes){
+                let i = points.indexOf(v);
+                console.assert(i != -1);
+                vertexIndices.push(i);
+            }
+        });
+    
+        // 色の配列
+        let vertexColors = this.getVertexColors(color, points.length);
+    
+        let mesh = {
+            vertexPosition: new Float32Array(positions),
+            vertexNormal: new Float32Array(normals),
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
