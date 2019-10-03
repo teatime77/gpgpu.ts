@@ -59,9 +59,14 @@ export class Drawable {
         return this;
     }
     
-    onDraw() {
+    getParam() {
         return this.param;
     }
+}
+
+export class ComponentDrawable extends Drawable {
+    children: Drawable[];
+
 }
 
 export class PackageParameter{
@@ -1090,19 +1095,29 @@ export class GPGPU {
         let viewModelMat = mat4.create();
         mat4.multiply(viewMat, modelMat, viewModelMat);
 
-        let projViewModelMat = mat4.create();
-        mat4.multiply(projMat, viewModelMat, projViewModelMat);
+        if(drawable instanceof ComponentDrawable){
+            for(let child of drawable.children){
+                this.draw(child, modelMat, viewMat, projMat)
+            }
+        }
 
-        let normalMatrix = mat3.create();
-        mat4.toInverseMat3(viewMat, normalMatrix);
-        mat3.transpose(normalMatrix);
+        let param = drawable.getParam();
 
-        let param = drawable.onDraw();
+        if(param != null){
 
-        param.args["uPMVMatrix"] = projViewModelMat;
-        param.args["uNMatrix"] = normalMatrix;
+            let projViewModelMat = mat4.create();
+            mat4.multiply(projMat, viewModelMat, projViewModelMat);
 
-        this.compute(param);
+            let normalMatrix = mat3.create();
+            mat4.toInverseMat3(viewMat, normalMatrix);
+            mat3.transpose(normalMatrix);
+
+
+            param.args["uPMVMatrix"] = projViewModelMat;
+            param.args["uNMatrix"] = normalMatrix;
+
+            this.compute(param);
+        }
     }
 
     /*

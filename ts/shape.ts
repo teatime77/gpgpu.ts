@@ -552,6 +552,18 @@ export class Color {
         this.b = b;
         this.a = a;
     }
+
+    static get red(): Color {
+        return new Color(1, 0, 0, 1);
+    }
+
+    static get green(): Color {
+        return new Color(0, 1, 0, 1);
+    }
+
+    static get blue(): Color {
+        return new Color(0, 0, 1, 1);
+    }
 }
 
 export class Circle extends Drawable {
@@ -657,7 +669,18 @@ export class Tube extends Drawable {
     }
 }
 
-export class Cylinder extends Drawable {
+export class Pillar extends ComponentDrawable {
+    constructor(colors: Color[], numDivision: number){
+        super();
+
+        this.children = [
+            new Tube(colors[0], numDivision),
+            (new Circle(colors[1], numDivision)).move(0, 0, 1),
+            (new Circle(colors[2], numDivision)).move(0, 0, -1),
+        ];
+
+        this.param = null;
+    }
 }
 
 export class Label extends Drawable {
@@ -790,7 +813,7 @@ export class ImageDrawable extends Drawable {
         this.img.src = src;
     }
 
-    onDraw() {
+    getParam() {
         if (!this.param) {
 
             var [mesh, idx_array] = gpgpu.makePlaneBuffers(new gpgpu.Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new gpgpu.TextureInfo(null, null, this.img));

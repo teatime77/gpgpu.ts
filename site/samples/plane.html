@@ -26,7 +26,7 @@ class MyDraw {
         this.img.src = "../img/world.topo.bathy.200408.2048x2048.png";
     }
 
-    onDraw() {
+    getParam() {
         if (!this.param) {
 
             var [mesh, idx_array] = gpgpu.makePlaneBuffers(new gpgpu.Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new gpgpu.TextureInfo(null, null, this.img));

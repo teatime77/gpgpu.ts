@@ -27,7 +27,7 @@ class MyDraw {
         this.img.src = "../img/world.topo.bathy.200408.2048x2048.png";
     }
 
-    onDraw() {
+    getParam() {
         if (!this.param) {
 
             var [mesh, idx_array] = gpgpu.makeEarthBuffers(new gpgpu.TextureInfo("vec4", null, this.img));
