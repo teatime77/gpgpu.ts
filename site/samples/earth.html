@@ -7,12 +7,15 @@
 <meta http-equiv="Cache-Control" content="no-cache">
 
 <script type="text/javascript" src="../js/glMatrix-0.9.5.min.js"></script>
-<script type="text/javascript" src="../js/gpgpu.js?ver=1570056313" ></script>
-<script type="text/javascript" src="../js/shape.js?ver=1570056313" ></script>
+<script type="text/javascript" src="../js/gpgpu.js?ver=1" ></script>
+<script type="text/javascript" src="../js/shape.js?ver=1" ></script>
 
 <script type="text/javascript">
 class MyDraw {
     constructor() {
+        this.transform = mat4.create();
+        mat4.identity(this.transform);
+
         this.img = new Image();
 
         this.img.onload = function () {

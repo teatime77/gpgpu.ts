@@ -588,11 +588,7 @@ export class Circle extends Drawable {
         vertexNormals.push(0, 0, 1);
     
         // 色の配列
-        let vertexColors = [];
-        range(numDivision + 1).forEach(x => {
-            vertexColors.push(color.r, color.g, color.b, color.a);
-        });
-
+        let vertexColors = this.getVertexColors(color, vertices.length);
     
         let mesh = {
             vertexPosition: new Float32Array(vertices),
@@ -601,7 +597,7 @@ export class Circle extends Drawable {
         } as Mesh;
             
         this.param = {
-            id: `label${Label.count++}`,
+            id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
@@ -610,8 +606,8 @@ export class Circle extends Drawable {
     }
 }
 
-export class Cylinder extends Drawable {
-    constructor(numDivision: number){
+export class Tube extends Drawable {
+    constructor(color: Color, numDivision: number){
         super();
 
         // 位置の配列
@@ -620,7 +616,7 @@ export class Cylinder extends Drawable {
         // 法線の配列
         let vertexNormals = [];
         
-        // 頂点インデックス
+        // 三角形の頂点インデックス
         let vertexIndices = [];
         
         for(let idx of range(numDivision)){
@@ -633,12 +629,38 @@ export class Cylinder extends Drawable {
 
             vertexNormals.push(x, y, 0);
 
+            let i1 = idx * 2
+            let i2 = idx * 2 + 1;
+            let i3 = (idx * 2 + 2) % (numDivision * 2);
+            let i4 = (idx * 2 + 3) % (numDivision * 2);
+
+            vertexIndices.push(i1, i2, i3);
+            vertexIndices.push(i3, i2, i4);
         }
+    
+        // 色の配列
+        let vertexColors = this.getVertexColors(color, vertices.length);
+
+        let mesh = {
+            vertexPosition: new Float32Array(vertices),
+            vertexNormal: new Float32Array(vertexNormals),
+            vertexColor: new Float32Array(vertexColors),
+        } as Mesh;
+            
+        this.param = {
+            id: `${this.constructor.name}.${Drawable.count++}`,
+            vertexShader: GPGPU.planeVertexShader,
+            fragmentShader: GPGPU.planeFragmentShader,
+            args: mesh,
+            VertexIndexBuffer: new Uint16Array(vertexIndices)
+        } as any as PackageParameter;
     }
 }
 
+export class Cylinder extends Drawable {
+}
+
 export class Label extends Drawable {
-    static count = 0;
     static texInf: TextureInfo;
     static canvas: HTMLCanvasElement;
     static ctx: CanvasRenderingContext2D;
@@ -747,7 +769,7 @@ export class Label extends Drawable {
         
     
         this.param = {
-            id: `label${Label.count++}`,
+            id: `label${Drawable.count++}`,
             vertexShader: gpgpu.GPGPU.planeTextureVertexShader,//.textureSphereVertexShader,
             fragmentShader: gpgpu.GPGPU.planeTextureFragmentShader,//defaultFragmentShader,
             args: mesh,
@@ -756,5 +778,35 @@ export class Label extends Drawable {
 
     }
 }
+
+
+export class ImageDrawable extends Drawable {
+    img: HTMLImageElement;
+
+    constructor(src: string, fnc) {
+        super();
+        this.img = new Image();
+        this.img.onload = fnc;
+        this.img.src = src;
+    }
+
+    onDraw() {
+        if (!this.param) {
+
+            var [mesh, idx_array] = gpgpu.makePlaneBuffers(new gpgpu.Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new gpgpu.TextureInfo(null, null, this.img));
+
+            this.param = {
+                id: "Earth",
+                vertexShader: gpgpu.GPGPU.textureSphereVertexShader,
+                fragmentShader: gpgpu.GPGPU.defaultFragmentShader,
+                args: mesh,
+                VertexIndexBuffer: idx_array
+            } as any as PackageParameter;
+        }
+
+        return this.param;
+    }
+}
+
 
 }

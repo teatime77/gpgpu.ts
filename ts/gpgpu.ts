@@ -28,12 +28,23 @@ function chk() {
 }
 
 export class Drawable {
+    static count = 0;
     param: PackageParameter;
     transform: Float32Array;
 
     constructor(){
         this.transform = mat4.create();
         mat4.identity(this.transform);
+    }
+
+    getVertexColors(color: Color, numVertex: number) : number[] {
+        let vertexColors = [];
+
+        range(numVertex + 1).forEach(x => {
+            vertexColors.push(color.r, color.g, color.b, color.a);
+        });
+
+        return vertexColors;
     }
 
     move(x: number, y: number, z: number) : Drawable {
@@ -1071,6 +1082,29 @@ export class GPGPU {
     setStandardShaderString() {
     }
 
+    draw(drawable: Drawable, worldMat: Float32Array, viewMat: Float32Array, projMat: Float32Array){
+
+        let modelMat = mat4.create();
+        mat4.multiply(worldMat, drawable.transform, modelMat);
+
+        let viewModelMat = mat4.create();
+        mat4.multiply(viewMat, modelMat, viewModelMat);
+
+        let projViewModelMat = mat4.create();
+        mat4.multiply(projMat, viewModelMat, projViewModelMat);
+
+        let normalMatrix = mat3.create();
+        mat4.toInverseMat3(viewMat, normalMatrix);
+        mat3.transpose(normalMatrix);
+
+        let param = drawable.onDraw();
+
+        param.args["uPMVMatrix"] = projViewModelMat;
+        param.args["uNMatrix"] = normalMatrix;
+
+        this.compute(param);
+    }
+
     /*
         3D表示をします。
     */
@@ -1078,33 +1112,22 @@ export class GPGPU {
         // カラーバッファと深度バッファをクリアする。
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); chk();
 
+        let viewMat = mat4.create();   // drawable.transform
+        mat4.identity(viewMat);
+
+        mat4.translate(viewMat, [this.drawParam.x, this.drawParam.y, this.drawParam.z]);
+
+        mat4.rotate(viewMat, this.drawParam.xRot, [1, 0, 0]);
+        mat4.rotate(viewMat, this.drawParam.yRot, [0, 1, 0]);
+
+        let projMat = mat4.create();
+        mat4.perspective(45, this.canvas.width / this.canvas.height, 0.1, 100.0, projMat);
 
         for(let drawable of this.drawables){
 
-            let pMatrix = mat4.create();
-            mat4.perspective(45, this.canvas.width / this.canvas.height, 0.1, 100.0, pMatrix);
-
-            let mvMatrix = mat4.create(drawable.transform);
-            // mat4.identity(mvMatrix);
-
-            mat4.translate(mvMatrix, [this.drawParam.x, this.drawParam.y, this.drawParam.z]);
-
-            mat4.rotate(mvMatrix, this.drawParam.xRot, [1, 0, 0]);
-            mat4.rotate(mvMatrix, this.drawParam.yRot, [0, 1, 0]);
-
-            let pmvMatrix = mat4.create();
-            mat4.multiply(pMatrix, mvMatrix, pmvMatrix);
-
-            let normalMatrix = mat3.create();
-            mat4.toInverseMat3(mvMatrix, normalMatrix);
-            mat3.transpose(normalMatrix);
-
-            let param = drawable.onDraw();
-
-            param.args["uPMVMatrix"] = pmvMatrix;
-            param.args["uNMatrix"] = normalMatrix;
-
-            this.compute(param);
+            let worldMat = mat4.create();
+            mat4.identity(worldMat);
+            this.draw(drawable, worldMat, viewMat, projMat);
         }
 
         // 次の再描画でdrawSceneが呼ばれるようにする。
