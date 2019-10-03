@@ -989,7 +989,7 @@ export class GPGPU {
     /*
         計算します。
     */
-    compute(param: PackageParameter) {
+    compute(param: PackageParameter, drawable: Drawable = undefined) {
         var pkg = this.packages[param.id] as Package;
         if (!pkg) {
             // パッケージが未作成の場合
@@ -1024,8 +1024,16 @@ export class GPGPU {
             // 頂点インデックスバッファをバインドする。
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf.buffer); chk();
 
-            // 三角形のリストを描画する。
-            gl.drawElements(gl.TRIANGLES, pkg.vertexIndexBufferInf.value.length, gl.UNSIGNED_SHORT, 0); chk();
+            if(drawable instanceof Points){
+
+                // 頂点のリストを描画する。
+                gl.drawElements(gl.POINTS, pkg.vertexIndexBufferInf.value.length, gl.UNSIGNED_SHORT, 0); chk();
+            }
+            else{
+
+                // 三角形のリストを描画する。
+                gl.drawElements(gl.TRIANGLES, pkg.vertexIndexBufferInf.value.length, gl.UNSIGNED_SHORT, 0); chk();
+            }
         }
         else {
             //  描画しない場合
@@ -1116,7 +1124,7 @@ export class GPGPU {
             param.args["uPMVMatrix"] = projViewModelMat;
             param.args["uNMatrix"] = normalMatrix;
 
-            this.compute(param);
+            this.compute(param, drawable);
         }
     }
 

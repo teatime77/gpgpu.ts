@@ -566,6 +566,32 @@ export class Color {
     }
 }
 
+export class Points extends Drawable {
+    constructor(vertices: Vertex[], color: Color, pointSize: number){
+        super();
+    
+        // 色の配列
+        let vertexColors = this.getVertexColors(color, vertices.length);
+    
+        const positions : number[] = [];
+        vertices.forEach(p => positions.push(p.x, p.y, p.z));
+
+        let mesh = {
+            vertexPosition: new Float32Array(positions),
+            vertexColor: new Float32Array(vertexColors),
+            pointSize  : pointSize
+        } as any as Mesh;
+            
+        this.param = {
+            id: `${this.constructor.name}.${Drawable.count++}`,
+            vertexShader: VertexShader.points,
+            fragmentShader: FragmentShader.points,
+            args: mesh,
+            VertexIndexBuffer: new Uint16Array(range(vertices.length))
+        } as any as PackageParameter;
+    }
+}
+
 export class Circle extends Drawable {
     constructor(color: Color, numDivision: number){
         super();
