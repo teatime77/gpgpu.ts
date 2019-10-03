@@ -321,10 +321,11 @@ function makeRegularIcosahedron() : [ Vertex[], Triangle[], number ] {
     return [ points, triangles, sphere_r ];
 }
 
-function divideTriangle(points, triangles, edges, sphere_r) {
-    var divide_cnt = 4;
+function divideTriangle(points1, triangles, sphere_r, divideCnt) {
+    let points2 = Array.from(points1) as Vertex[];
+    let edges = [];
 
-    for (var divide_idx = 0; divide_idx < divide_cnt; divide_idx++) {
+    for (var divide_idx = 0; divide_idx < divideCnt; divide_idx++) {
 
         // 三角形を分割する。
         var new_triangles = [];
@@ -372,7 +373,7 @@ function divideTriangle(points, triangles, edges, sphere_r) {
                 mid.y *= sphere_r / d;
                 mid.z *= sphere_r / d;
 
-                points.push(mid);
+                points2.push(mid);
 
                 console.assert(Math.abs(sphere_r - vecLen(mid)) < 0.001);
             }
@@ -397,7 +398,7 @@ function divideTriangle(points, triangles, edges, sphere_r) {
             new_triangles.push(new Triangle(pnts[2], midpoints[2], midpoints[1], true));
         });
 
-        points.forEach(function (p) {
+        points2.forEach(function (p) {
             console.assert(p.adjacentVertexes.length == 5 || p.adjacentVertexes.length == 6);
         });
 
@@ -418,7 +419,7 @@ function divideTriangle(points, triangles, edges, sphere_r) {
 
    console.log(`半径:${sphere_r} 三角形 ${triangles.length}`);
 
-    return triangles;
+    return [ points2, triangles, edges ];
 }
 
 function setTextureCoords(points: Vertex[], sphere_r) {
@@ -454,39 +455,37 @@ function setTextureCoords(points: Vertex[], sphere_r) {
 }
 
 export function makeEarthBuffers(tex_inv: TextureInfo) {
-    let [ points, triangles, sphere_r ] = makeRegularIcosahedron();
+    let [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
 
-    var edges = [];
+    let [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, 4);
 
-    triangles = divideTriangle(points, triangles, edges, sphere_r);
-
-    setTextureCoords(points, sphere_r);
+    setTextureCoords(points2, sphere_r);
 
     // 頂点インデックス
     var vertexIndices = [];
 
-    triangles.forEach(x =>
-        vertexIndices.push(points.indexOf(x.Vertexes[0]), points.indexOf(x.Vertexes[1]), points.indexOf(x.Vertexes[2]))
+    triangles2.forEach(x =>
+        vertexIndices.push(points2.indexOf(x.Vertexes[0]), points2.indexOf(x.Vertexes[1]), points2.indexOf(x.Vertexes[2]))
     );
 
     // 法線をセット
-    points.forEach(p => SetNorm(p));
+    points2.forEach(p => SetNorm(p));
 
     // 位置の配列
     var vertices = [];
-    points.forEach(p =>
+    points2.forEach(p =>
         vertices.push(p.x, p.y, p.z)
     );
 
     // 法線の配列
     var vertexNormals = [];
-    points.forEach(p =>
+    points2.forEach(p =>
         vertexNormals.push(p.nx, p.ny, p.nz)
     );
 
     // テクスチャ座標
     var textureCoords = [];
-    points.forEach(p =>
+    points2.forEach(p =>
         textureCoords.push(p.texX, p.texY)
     );
 
@@ -715,6 +714,52 @@ export class RegularIcosahedron extends Drawable {
     
         // 色の配列
         let vertexColors = this.getVertexColors(color, points.length);
+    
+        let mesh = {
+            vertexPosition: new Float32Array(positions),
+            vertexNormal: new Float32Array(normals),
+            vertexColor: new Float32Array(vertexColors),
+        } as Mesh;
+            
+        this.param = {
+            id: `${this.constructor.name}.${Drawable.count++}`,
+            vertexShader: GPGPU.planeVertexShader,
+            fragmentShader: GPGPU.planeFragmentShader,
+            args: mesh,
+            VertexIndexBuffer: new Uint16Array(vertexIndices)
+        } as any as PackageParameter;
+    }
+}
+
+
+export class GeodesicPolyhedron extends Drawable {
+    constructor(color: Color, divideCnt: number){
+        super();
+
+        let [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
+        let [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, divideCnt);
+
+
+        const positions : number[] = [];
+        const normals : number[] = [];
+        points2.forEach(p =>  {
+            positions.push(p.x, p.y, p.z);
+
+            let n = p.unit();
+            normals.push(n.x, n.y, n.z);
+        });
+
+        const vertexIndices : number[] = [];
+        triangles2.forEach(tri => {
+            for(let v of tri.Vertexes){
+                let i = points2.indexOf(v);
+                console.assert(i != -1);
+                vertexIndices.push(i);
+            }
+        });
+    
+        // 色の配列
+        let vertexColors = this.getVertexColors(color, points2.length);
     
         let mesh = {
             vertexPosition: new Float32Array(positions),
