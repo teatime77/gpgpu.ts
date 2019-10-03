@@ -1029,6 +1029,11 @@ export class GPGPU {
                 // 頂点のリストを描画する。
                 gl.drawElements(gl.POINTS, pkg.vertexIndexBufferInf.value.length, gl.UNSIGNED_SHORT, 0); chk();
             }
+            else if(drawable instanceof Lines){
+
+                // 線分のリストを描画する。
+                gl.drawElements(gl.LINES, pkg.vertexIndexBufferInf.value.length, gl.UNSIGNED_SHORT, 0); chk();
+            }
             else{
 
                 // 三角形のリストを描画する。
