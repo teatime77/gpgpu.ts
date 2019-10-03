@@ -1208,7 +1208,7 @@ export class GPGPU {
 
         // wheelのイベント リスナーを登録する。
         this.canvas.addEventListener("wheel",  (ev: WheelEvent)=> {
-            this.drawParam.z += 0.02 * ev.deltaY;
+            this.drawParam.z += 0.002 * ev.deltaY;
 
             // ホイール操作によるスクロールを無効化する
             ev.preventDefault();

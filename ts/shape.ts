@@ -618,6 +618,64 @@ export class Circle extends Drawable {
     }
 }
 
+
+export class Cone extends ComponentDrawable {
+    constructor(color: Color, numDivision: number){
+        super();
+
+        // 位置の配列
+        let vertices = [];
+    
+        // 法線の配列
+        let vertexNormals = [];
+        
+        // 頂点インデックス
+        let vertexIndices = [];
+        
+        const divSqrt2 = 1 / Math.sqrt(2);
+
+        // 円周上の点
+        for(let idx of range(numDivision)){
+            let theta = 2 * Math.PI * idx / numDivision;
+            let x = Math.cos(theta);
+            let y = Math.sin(theta);
+
+            // 位置
+            vertices.push(x, y, 0);
+
+            // 法線
+            vertexNormals.push(divSqrt2 * x, divSqrt2 * y, divSqrt2);
+
+            // 三角形の頂点インデックス
+            vertexIndices.push(idx, (idx + 1) % numDivision, numDivision);
+        }
+
+        // 円の中心
+        vertices.push(0, 0, 1);
+        vertexNormals.push(0, 0, 1);
+    
+        // 色の配列
+        let vertexColors = this.getVertexColors(color, vertices.length);
+    
+        let mesh = {
+            vertexPosition: new Float32Array(vertices),
+            vertexNormal: new Float32Array(vertexNormals),
+            vertexColor: new Float32Array(vertexColors),
+        } as Mesh;
+            
+        this.param = {
+            id: `${this.constructor.name}.${Drawable.count++}`,
+            vertexShader: GPGPU.planeVertexShader,
+            fragmentShader: GPGPU.planeFragmentShader,
+            args: mesh,
+            VertexIndexBuffer: new Uint16Array(vertexIndices)
+        } as any as PackageParameter;
+
+        this.children = [];
+    }
+}
+
+
 export class Tube extends Drawable {
     constructor(color: Color, numDivision: number){
         super();
