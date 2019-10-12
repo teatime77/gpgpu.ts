@@ -1,5 +1,3 @@
-namespace gpgpu {
-
 export class VertexShader {
         static readonly points = `
 
@@ -52,19 +50,5 @@ export class FragmentShader {
             color = fragmentColor;
         }
         `;
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
 
 }

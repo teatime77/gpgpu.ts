@@ -5,9 +5,11 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Cache-Control" content="no-cache">
 
-<script type="text/javascript" src="../js/gpgpu.js?ver=1" ></script>
+<script type="module" src="../js/gpgpu.js?ver=1" ></script>
 
-<script type="text/javascript">
+<script type="module">
+    import {CreateGPGPU} from "../js/gpgpu.js";
+
     function onBodyLoad() {
 // 頂点シェーダのプログラムは文字列で記述します。
 var vertex_shader =
@@ -78,9 +80,12 @@ setTimeout(()=>{
     3000);
 
 }
+
+document.body.onload = onBodyLoad();
+
 </script>
 </head>
-<body onload="onBodyLoad()">
+<body>
     <h1>配列の加算と乗算</h1>
 </body>
 </html>

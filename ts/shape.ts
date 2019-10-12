@@ -1,4 +1,5 @@
-﻿namespace gpgpu {
+﻿import {TextureInfo, Mesh, Drawable, range, PackageParameter, GPGPU} from "./gpgpu.js"
+import { ComponentDrawable, Vertex, Color } from "./gpgpu.js";
 
 export class Box {
     x1: number;
@@ -62,48 +63,6 @@ class Triangle {
                 this.Vertexes = [q, p, r];
             }
         }
-    }
-}
-
-class Vec3 {
-    x: number;
-    y: number;
-    z: number;
-
-    constructor(x, y, z){
-        this.x = x;
-        this.y = y;
-        this.z = z;
-    }
-
-    len(){
-        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
-    }
-
-    unit() : Vec3 {
-        const len = this.len();
-
-        if(len == 0){
-            return new Vec3(0, 0, 0);
-        }
-        else{
-            return new Vec3(this.x / len, this.y / len, this.z / len);
-        }
-    }
-}
-
-class Vertex extends Vec3 {
-    nx: number;
-    ny: number;
-    nz: number;
-    texX: number;
-    texY: number;
-
-    adjacentVertexes: Vertex[];
-
-    constructor(x, y, z) {
-        super(x, y, z);
-        this.adjacentVertexes = [];
     }
 }
 
@@ -503,7 +462,7 @@ export function makeEarthBuffers(tex_inv: TextureInfo) {
 }
 
 
-export function makePlaneBuffers(box: Box, nx: number, ny: number, tex_inv: TextureInfo) {
+export function makePlaneBuffers(box: Box, nx: number, ny: number, tex_inv: TextureInfo) : [Mesh, Uint16Array] {
     // 位置の配列
     var vertices = [];
 
@@ -557,83 +516,6 @@ export function makePlaneBuffers(box: Box, nx: number, ny: number, tex_inv: Text
     return [mesh, idx_array];
 }
 
-export class Color {
-    r: number;
-    g: number;
-    b: number;
-    a: number;
-
-    constructor(r:number, g: number, b: number, a: number){
-        this.r = r;
-        this.g = g;
-        this.b = b;
-        this.a = a;
-    }
-
-    static get red(): Color {
-        return new Color(1, 0, 0, 1);
-    }
-
-    static get green(): Color {
-        return new Color(0, 1, 0, 1);
-    }
-
-    static get blue(): Color {
-        return new Color(0, 0, 1, 1);
-    }
-}
-
-export class Points extends Drawable {
-    constructor(vertices: Vertex[], color: Color, pointSize: number){
-        super();
-    
-        // 色の配列
-        let vertexColors = this.getVertexColors(color, vertices.length);
-    
-        const positions : number[] = [];
-        vertices.forEach(p => positions.push(p.x, p.y, p.z));
-
-        let mesh = {
-            vertexPosition: new Float32Array(positions),
-            vertexColor: new Float32Array(vertexColors),
-            pointSize  : pointSize
-        } as any as Mesh;
-            
-        this.param = {
-            id: `${this.constructor.name}.${Drawable.count++}`,
-            vertexShader: VertexShader.points,
-            fragmentShader: FragmentShader.points,
-            args: mesh,
-            VertexIndexBuffer: new Uint16Array(range(vertices.length))
-        } as any as PackageParameter;
-    }
-}
-
-
-export class Lines extends Drawable {
-    constructor(vertices: Vertex[], color: Color){
-        super();
-    
-        // 色の配列
-        let vertexColors = this.getVertexColors(color, vertices.length);
-    
-        const positions : number[] = [];
-        vertices.forEach(p => positions.push(p.x, p.y, p.z));
-
-        let mesh = {
-            vertexPosition: new Float32Array(positions),
-            vertexColor: new Float32Array(vertexColors),
-        } as any as Mesh;
-            
-        this.param = {
-            id: `${this.constructor.name}.${Drawable.count++}`,
-            vertexShader: VertexShader.lines,
-            fragmentShader: FragmentShader.points,
-            args: mesh,
-            VertexIndexBuffer: new Uint16Array(range(vertices.length))
-        } as any as PackageParameter;
-    }
-}
 
 
 export class Circle extends Drawable {
@@ -1004,14 +886,14 @@ export class Label extends Drawable {
             vertexPosition: new Float32Array(vertices),
             vertexNormal: new Float32Array(vertexNormals),
             textureCoord: new Float32Array(textureCoords),
-            textureImage: new gpgpu.TextureInfo(null, null, Label.canvas)
+            textureImage: new TextureInfo(null, null, Label.canvas)
         } as Mesh;
         
     
         this.param = {
             id: `label${Drawable.count++}`,
-            vertexShader: gpgpu.GPGPU.planeTextureVertexShader,//.textureSphereVertexShader,
-            fragmentShader: gpgpu.GPGPU.planeTextureFragmentShader,//defaultFragmentShader,
+            vertexShader: GPGPU.planeTextureVertexShader,//.textureSphereVertexShader,
+            fragmentShader: GPGPU.planeTextureFragmentShader,//defaultFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
         } as any as PackageParameter;
@@ -1033,12 +915,12 @@ export class ImageDrawable extends Drawable {
     getParam() {
         if (!this.param) {
 
-            var [mesh, idx_array] = gpgpu.makePlaneBuffers(new gpgpu.Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new gpgpu.TextureInfo(null, null, this.img));
+            var [mesh, idx_array] = makePlaneBuffers(new Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new TextureInfo(null, null, this.img));
 
             this.param = {
                 id: "Earth",
-                vertexShader: gpgpu.GPGPU.textureSphereVertexShader,
-                fragmentShader: gpgpu.GPGPU.defaultFragmentShader,
+                vertexShader: GPGPU.textureSphereVertexShader,
+                fragmentShader: GPGPU.defaultFragmentShader,
                 args: mesh,
                 VertexIndexBuffer: idx_array
             } as any as PackageParameter;
@@ -1046,7 +928,4 @@ export class ImageDrawable extends Drawable {
 
         return this.param;
     }
-}
-
-
 }

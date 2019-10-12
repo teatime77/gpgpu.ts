@@ -6,10 +6,13 @@
 <meta http-equiv="Cache-Control" content="no-cache">
 
 <script type="text/javascript" src="../js/glMatrix-0.9.5.min.js"></script>
-<script type="text/javascript" src="../js/gpgpu.js?ver=1" ></script>
-<script type="text/javascript" src="../js/shape.js?ver=1" ></script>
+<script type="module" src="../js/gpgpu.js?ver=1" ></script>
+<script type="module" src="../js/shape.js?ver=1" ></script>
 
-<script type="text/javascript">
+<script type="module">
+    import {CreateGPGPU, GPGPU, TextureInfo} from "../js/gpgpu.js";
+    import {makePlaneBuffers, Box} from "../js/shape.js";
+
 class MyDraw {
     constructor() {
         this.transform = mat4.create();
@@ -29,12 +32,12 @@ class MyDraw {
     getParam() {
         if (!this.param) {
 
-            var [mesh, idx_array] = gpgpu.makePlaneBuffers(new gpgpu.Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new gpgpu.TextureInfo(null, null, this.img));
+            var [mesh, idx_array] = makePlaneBuffers(new Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new TextureInfo(null, null, this.img));
 
             this.param = {
                 id: "Earth",
-                vertexShader: gpgpu.GPGPU.textureSphereVertexShader,
-                fragmentShader: gpgpu.GPGPU.defaultFragmentShader,
+                vertexShader: GPGPU.textureSphereVertexShader,
+                fragmentShader: GPGPU.defaultFragmentShader,
                 args: mesh,
                 VertexIndexBuffer: idx_array
             };
@@ -43,9 +46,13 @@ class MyDraw {
         return this.param;
     }
 }
+
+document.body.onload = function(){
+    new MyDraw();
+}
 </script>
 </head>
-<body onload="new MyDraw()">
+<body>
     <a href="test.html"">次</a>
     <canvas id="webgl-canvas" style="border: none;" width="500" height="500"></canvas>
 </body>
