@@ -820,15 +820,7 @@ export class GPGPU {
 
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); chk();
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); chk();    // LINEAR_MIPMAP_NEAREST
-
-                if(tex_inf.value instanceof HTMLCanvasElement){
-
-                }
-                else{
-
-                    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); chk();
-                }
-
+                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); chk();
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tex_inf.value); chk();
                 gl.generateMipmap(gl.TEXTURE_2D); chk();
             }
