@@ -268,7 +268,7 @@ export class Mesh {
     textureImage: TextureInfo;
 }
 
-class DrawParam{
+export class DrawParam{
     xRot : number;
     yRot : number;
     x    : number;
@@ -444,6 +444,15 @@ export class GPGPU {
     packages : Map<string, Package>;
     drawables: Drawable[];
     drawParam: DrawParam;
+
+    lastMouseX = null;
+    lastMouseY = null;
+
+    mousedown: (ev: MouseEvent, drawParam: DrawParam)=>void;
+    mouseup  : (ev: MouseEvent, drawParam: DrawParam)=>void;
+    mousemove: (ev: MouseEvent, drawParam: DrawParam)=>void;
+    touchmove: (ev: TouchEvent, drawParam: DrawParam)=>void;
+    wheel    : (ev: WheelEvent, drawParam: DrawParam)=>void;
 
     /*
         GPGPUのコンストラクタ
@@ -1277,6 +1286,56 @@ export class GPGPU {
         window.requestAnimationFrame(this.drawScene.bind(this));
     }
 
+    defaultMousemove(ev: MouseEvent, drawParam: DrawParam){
+        var newX = ev.clientX;
+        var newY = ev.clientY;
+
+        if (ev.buttons != 0 && this.lastMouseX != null) {
+
+            if(ev.shiftKey){
+
+                drawParam.x += (newX - this.lastMouseX) / 300;
+                drawParam.y -= (newY - this.lastMouseY) / 300;
+            }
+            else{
+
+                drawParam.xRot += (newY - this.lastMouseY) / 300;
+                drawParam.yRot += (newX - this.lastMouseX) / 300;
+            }
+        }
+
+        this.lastMouseX = newX
+        this.lastMouseY = newY;
+    }
+
+    defaultTouchmove(ev: TouchEvent, drawParam: DrawParam){
+        // タッチによる画面スクロールを止める
+        ev.preventDefault(); 
+
+        var newX = ev.changedTouches[0].clientX;
+        var newY = ev.changedTouches[0].clientY;
+
+        if (this.lastMouseX != null) {
+
+            drawParam.xRot += (newY - this.lastMouseY) / 300;
+            drawParam.yRot += (newX - this.lastMouseX) / 300;
+        }
+
+        this.lastMouseX = newX
+        this.lastMouseY = newY;
+    }
+
+
+    defaultWheel(ev: WheelEvent, drawParam: DrawParam){
+        drawParam.z += 0.002 * ev.deltaY;
+
+        // ホイール操作によるスクロールを無効化する
+        ev.preventDefault();
+    }
+
+
+
+
     /*
         3D表示を開始します。
     */
@@ -1290,56 +1349,48 @@ export class GPGPU {
             z    : -5.0
         } as DrawParam;
 
-        var lastMouseX = null;
-        var lastMouseY = null;
+        // mousedownのイベント リスナーを登録する。
+        this.canvas.addEventListener("mousedown", (ev: MouseEvent)=> {
+            if(this.mousedown != undefined){
+                this.mousedown(ev, this.drawParam);
+            }
+        });
+
+        // mouseupのイベント リスナーを登録する。
+        this.canvas.addEventListener("mouseup", (ev: MouseEvent)=> {
+            if(this.mouseup != undefined){
+                this.mouseup(ev, this.drawParam);
+            }
+        });
 
         // mousemoveのイベント リスナーを登録する。
         this.canvas.addEventListener('mousemove', (ev: MouseEvent)=> {
-            var newX = ev.clientX;
-            var newY = ev.clientY;
-
-            if (ev.buttons != 0 && lastMouseX != null) {
-
-                if(ev.shiftKey){
-
-                    this.drawParam.x += (newX - lastMouseX) / 300;
-                    this.drawParam.y -= (newY - lastMouseY) / 300;
-                }
-                else{
-
-                    this.drawParam.xRot += (newY -lastMouseY) / 300;
-                    this.drawParam.yRot += (newX - lastMouseX) / 300;
-                }
+            if(this.mousemove != undefined){
+                this.mousemove(ev, this.drawParam);
             }
-
-            lastMouseX = newX
-            lastMouseY = newY;
+            else{
+                this.defaultMousemove(ev, this.drawParam);
+            }
         });
 
         // touchmoveのイベント リスナーを登録する。
         this.canvas.addEventListener('touchmove', (ev: TouchEvent)=> {
-            // タッチによる画面スクロールを止める
-            ev.preventDefault(); 
-
-            var newX = ev.changedTouches[0].clientX;
-            var newY = ev.changedTouches[0].clientY;
-
-            if (lastMouseX != null) {
-
-                this.drawParam.xRot += (newY - lastMouseY) / 300;
-                this.drawParam.yRot += (newX - lastMouseX) / 300;
+            if(this.touchmove != undefined){
+                this.touchmove(ev, this.drawParam);
             }
-
-            lastMouseX = newX
-            lastMouseY = newY;
+            else{
+                this.defaultTouchmove(ev, this.drawParam);
+            }
         }, false);
 
         // wheelのイベント リスナーを登録する。
         this.canvas.addEventListener("wheel",  (ev: WheelEvent)=> {
-            this.drawParam.z += 0.002 * ev.deltaY;
-
-            // ホイール操作によるスクロールを無効化する
-            ev.preventDefault();
+            if(this.wheel != undefined){
+                this.wheel(ev, this.drawParam);
+            }
+            else{
+                this.defaultWheel(ev, this.drawParam);
+            }
         });
 
         // 3D表示をする。
