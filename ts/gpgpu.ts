@@ -201,7 +201,7 @@ export class PackageParameter{
     elementCount: number;
 }
 
-class Package{
+export class Package{
     id: string;
     program: WebGLProgram;
     transformFeedback: WebGLTransformFeedback;
@@ -220,6 +220,7 @@ class Package{
     テクスチャのテクセルの型、サイズ、値の情報を持ちます。
 */
 export class TextureInfo {
+    dirty: boolean = true;
     name: string;
     isArray: boolean;
     texelType: string;
@@ -274,6 +275,67 @@ export class DrawParam{
     x    : number;
     y    : number;
     z    : number;
+}
+
+export class UI3D {
+    lastMouseX = null;
+    lastMouseY = null;
+
+    mousedown : (ev: MouseEvent, drawParam: DrawParam)=>void;
+
+    mouseup : (ev: MouseEvent, drawParam: DrawParam)=>void;
+
+    mousemove : (ev: MouseEvent, drawParam: DrawParam)=>void;
+
+    pointerdown : (ev: PointerEvent, drawParam: DrawParam)=>void;
+    pointerup   : (ev: PointerEvent, drawParam: DrawParam)=>void;
+
+    pointermove = (ev: PointerEvent, drawParam: DrawParam)=>{
+        var newX = ev.clientX;
+        var newY = ev.clientY;
+
+        if (ev.buttons != 0 && this.lastMouseX != null) {
+
+            if(ev.shiftKey){
+
+                drawParam.x += (newX - this.lastMouseX) / 300;
+                drawParam.y -= (newY - this.lastMouseY) / 300;
+            }
+            else{
+
+                drawParam.xRot += (newY - this.lastMouseY) / 300;
+                drawParam.yRot += (newX - this.lastMouseX) / 300;
+            }
+        }
+
+        this.lastMouseX = newX
+        this.lastMouseY = newY;
+    }
+
+    touchmove = (ev: TouchEvent, drawParam: DrawParam)=>{
+        // タッチによる画面スクロールを止める
+        ev.preventDefault(); 
+
+        var newX = ev.changedTouches[0].clientX;
+        var newY = ev.changedTouches[0].clientY;
+
+        if (this.lastMouseX != null) {
+
+            drawParam.xRot += (newY - this.lastMouseY) / 300;
+            drawParam.yRot += (newX - this.lastMouseX) / 300;
+        }
+
+        this.lastMouseX = newX
+        this.lastMouseY = newY;
+    }
+
+
+    wheel = (ev: WheelEvent, drawParam: DrawParam)=>{
+        drawParam.z += 0.002 * ev.deltaY;
+
+        // ホイール操作によるスクロールを無効化する
+        ev.preventDefault();
+    }
 }
 
 /*
@@ -444,21 +506,15 @@ export class GPGPU {
     packages : Map<string, Package>;
     drawables: Drawable[];
     drawParam: DrawParam;
-
-    lastMouseX = null;
-    lastMouseY = null;
-
-    mousedown: (ev: MouseEvent, drawParam: DrawParam)=>void;
-    mouseup  : (ev: MouseEvent, drawParam: DrawParam)=>void;
-    mousemove: (ev: MouseEvent, drawParam: DrawParam)=>void;
-    touchmove: (ev: TouchEvent, drawParam: DrawParam)=>void;
-    wheel    : (ev: WheelEvent, drawParam: DrawParam)=>void;
+    ui3D : UI3D;
 
     /*
         GPGPUのコンストラクタ
     */
-    constructor(canvas: HTMLCanvasElement) {
+    constructor(canvas: HTMLCanvasElement, ui3d: UI3D) {
         console.log("init WebGL");
+
+        this.ui3D = ui3d;
 
         if (!canvas) {
             // canvasが指定されていない場合
@@ -862,9 +918,16 @@ export class GPGPU {
             // テクスチャをバインドする。
             gl.bindTexture(dim, tex_inf.Texture); chk();
 
+            if(! tex_inf.dirty){
+                continue;
+            }
+            tex_inf.dirty = false;
+
             if (tex_inf.value instanceof HTMLImageElement || tex_inf.value instanceof HTMLCanvasElement) {
                 // テクスチャが画像の場合
 
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tex_inf.value); chk();
+                gl.generateMipmap(gl.TEXTURE_2D); chk();
             }
             else {
                 // テクスチャが画像でない場合
@@ -1286,56 +1349,6 @@ export class GPGPU {
         window.requestAnimationFrame(this.drawScene.bind(this));
     }
 
-    defaultMousemove(ev: MouseEvent, drawParam: DrawParam){
-        var newX = ev.clientX;
-        var newY = ev.clientY;
-
-        if (ev.buttons != 0 && this.lastMouseX != null) {
-
-            if(ev.shiftKey){
-
-                drawParam.x += (newX - this.lastMouseX) / 300;
-                drawParam.y -= (newY - this.lastMouseY) / 300;
-            }
-            else{
-
-                drawParam.xRot += (newY - this.lastMouseY) / 300;
-                drawParam.yRot += (newX - this.lastMouseX) / 300;
-            }
-        }
-
-        this.lastMouseX = newX
-        this.lastMouseY = newY;
-    }
-
-    defaultTouchmove(ev: TouchEvent, drawParam: DrawParam){
-        // タッチによる画面スクロールを止める
-        ev.preventDefault(); 
-
-        var newX = ev.changedTouches[0].clientX;
-        var newY = ev.changedTouches[0].clientY;
-
-        if (this.lastMouseX != null) {
-
-            drawParam.xRot += (newY - this.lastMouseY) / 300;
-            drawParam.yRot += (newX - this.lastMouseX) / 300;
-        }
-
-        this.lastMouseX = newX
-        this.lastMouseY = newY;
-    }
-
-
-    defaultWheel(ev: WheelEvent, drawParam: DrawParam){
-        drawParam.z += 0.002 * ev.deltaY;
-
-        // ホイール操作によるスクロールを無効化する
-        ev.preventDefault();
-    }
-
-
-
-
     /*
         3D表示を開始します。
     */
@@ -1349,49 +1362,61 @@ export class GPGPU {
             z    : -5.0
         } as DrawParam;
 
+        // pointerdownのイベント リスナーを登録する。
+        if(this.ui3D.pointerdown != undefined){
+            this.canvas.addEventListener("pointerdown", (ev: PointerEvent)=> {
+                this.ui3D.pointerdown(ev, this.drawParam);
+            });
+        }
+
+        // pointerupのイベント リスナーを登録する。
+        if(this.ui3D.pointerup != undefined){
+            this.canvas.addEventListener("pointerup", (ev: PointerEvent)=> {
+                this.ui3D.pointerup(ev, this.drawParam);
+            });
+        }
+
+        // pointermoveのイベント リスナーを登録する。
+        if(this.ui3D.pointermove != undefined){
+            this.canvas.addEventListener("pointermove", (ev: PointerEvent)=> {
+                this.ui3D.pointermove(ev, this.drawParam);
+            });
+        }
+
         // mousedownのイベント リスナーを登録する。
-        this.canvas.addEventListener("mousedown", (ev: MouseEvent)=> {
-            if(this.mousedown != undefined){
-                this.mousedown(ev, this.drawParam);
-            }
-        });
+        if(this.ui3D.mousedown != undefined){
+            this.canvas.addEventListener("mousedown", (ev: MouseEvent)=> {
+                this.ui3D.mousedown(ev, this.drawParam);
+            });
+        }
 
         // mouseupのイベント リスナーを登録する。
-        this.canvas.addEventListener("mouseup", (ev: MouseEvent)=> {
-            if(this.mouseup != undefined){
-                this.mouseup(ev, this.drawParam);
-            }
-        });
+        if(this.ui3D.mouseup != undefined){
+            this.canvas.addEventListener("mouseup", (ev: MouseEvent)=> {
+                this.ui3D.mouseup(ev, this.drawParam);
+            });
+        }
 
         // mousemoveのイベント リスナーを登録する。
-        this.canvas.addEventListener('mousemove', (ev: MouseEvent)=> {
-            if(this.mousemove != undefined){
-                this.mousemove(ev, this.drawParam);
-            }
-            else{
-                this.defaultMousemove(ev, this.drawParam);
-            }
-        });
+        if(this.ui3D.mousemove != undefined){
+            this.canvas.addEventListener('mousemove', (ev: MouseEvent)=> {
+                this.ui3D.mousemove(ev, this.drawParam);
+            });
+        }
 
         // touchmoveのイベント リスナーを登録する。
-        this.canvas.addEventListener('touchmove', (ev: TouchEvent)=> {
-            if(this.touchmove != undefined){
-                this.touchmove(ev, this.drawParam);
-            }
-            else{
-                this.defaultTouchmove(ev, this.drawParam);
-            }
-        }, false);
+        if(this.ui3D.touchmove != undefined){
+            this.canvas.addEventListener('touchmove', (ev: TouchEvent)=> {
+                this.ui3D.touchmove(ev, this.drawParam);
+            }, false);
+        }
 
         // wheelのイベント リスナーを登録する。
-        this.canvas.addEventListener("wheel",  (ev: WheelEvent)=> {
-            if(this.wheel != undefined){
-                this.wheel(ev, this.drawParam);
-            }
-            else{
-                this.defaultWheel(ev, this.drawParam);
-            }
-        });
+        if(this.ui3D.wheel != undefined){
+            this.canvas.addEventListener("wheel",  (ev: WheelEvent)=> {
+                this.ui3D.wheel(ev, this.drawParam);
+            });
+        }
 
         // 3D表示をする。
         this.drawScene();
@@ -1403,6 +1428,6 @@ export class GPGPU {
 
     この関数の内部に関数やクラスを入れて外部から参照されないようにします。
 */
-export function CreateGPGPU(canvas: HTMLCanvasElement) {
-    return new GPGPU(canvas);
+export function CreateGPGPU(canvas: HTMLCanvasElement, ui3d: UI3D=new UI3D()) {
+    return new GPGPU(canvas, ui3d);
 }
