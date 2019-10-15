@@ -159,6 +159,21 @@ export class Points extends Drawable {
             VertexIndexBuffer: new Uint16Array(range(vertices.length))
         } as any as PackageParameter;
     }
+
+    update(vertices: Vertex[], color: Color, pointSize: number){
+        // 色の配列
+        let vertexColors = this.getVertexColors(color, vertices.length);
+    
+        const positions : number[] = [];
+        vertices.forEach(p => positions.push(p.x, p.y, p.z));
+
+        let mesh = this.param.args as Mesh;
+        mesh.vertexPosition = new Float32Array(positions);
+        mesh.vertexColor = new Float32Array(vertexColors);
+        mesh.pointSize = pointSize;
+        
+        this.param.VertexIndexBuffer = new Uint16Array(range(vertices.length));
+    }
 }
 
 
@@ -196,7 +211,7 @@ export class PackageParameter{
     id: string;
     vertexShader: string;
     fragmentShader: string;
-    args: Map<string, Float32Array|TextureInfo>;
+    args: Map<string, Float32Array|TextureInfo>|Mesh;
     VertexIndexBuffer: Uint16Array | Uint32Array;
     elementCount: number;
 }
@@ -205,7 +220,7 @@ export class Package{
     id: string;
     program: WebGLProgram;
     transformFeedback: WebGLTransformFeedback;
-    vertexIndexBufferInf: VertexIndexBufferInf;
+    vertexIndexBufferInf: WebGLBuffer;
     textures: TextureInfo[];
     attribElementCount: number;
     elementCount: number;
@@ -256,17 +271,13 @@ class ArgInf {
     AttribLoc: number;
 }
 
-class VertexIndexBufferInf {
-    value: Uint16Array | Uint32Array;
-    buffer: WebGLBuffer;
-}
-
 export class Mesh {
     vertexPosition: Float32Array;
     vertexNormal: Float32Array;
     vertexColor : Float32Array;
     textureCoord: Float32Array;
     textureImage: TextureInfo;
+    pointSize : number;
 }
 
 export class DrawParam{
@@ -981,14 +992,10 @@ export class GPGPU {
         gl.clearColor(0.0, 0.0, 0.0, 1.0); chk();
         gl.enable(gl.DEPTH_TEST); chk();
 
-        var buf : WebGLBuffer = gl.createBuffer(); chk();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf); chk();
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, param.VertexIndexBuffer, gl.STATIC_DRAW); chk();
+        pkg.vertexIndexBufferInf = gl.createBuffer(); chk();
 
-        pkg.vertexIndexBufferInf = {
-            value: param.VertexIndexBuffer,
-            buffer: buf
-        } as VertexIndexBufferInf;
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf); chk();
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, param.VertexIndexBuffer, gl.STATIC_DRAW); chk();
     }
 
     /*
@@ -1209,22 +1216,23 @@ export class GPGPU {
             gl.viewport(0, 0, this.canvas.width, this.canvas.height); chk();
 
             // 頂点インデックスバッファをバインドする。
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf.buffer); chk();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf); chk();
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, param.VertexIndexBuffer, gl.STATIC_DRAW); chk();
 
             if(drawable instanceof Points){
 
                 // 頂点のリストを描画する。
-                gl.drawElements(gl.POINTS, pkg.vertexIndexBufferInf.value.length, gl.UNSIGNED_SHORT, 0); chk();
+                gl.drawElements(gl.POINTS, param.VertexIndexBuffer.length, gl.UNSIGNED_SHORT, 0); chk();
             }
             else if(drawable instanceof Lines){
 
                 // 線分のリストを描画する。
-                gl.drawElements(gl.LINES, pkg.vertexIndexBufferInf.value.length, gl.UNSIGNED_SHORT, 0); chk();
+                gl.drawElements(gl.LINES, param.VertexIndexBuffer.length, gl.UNSIGNED_SHORT, 0); chk();
             }
             else{
 
                 // 三角形のリストを描画する。
-                gl.drawElements(gl.TRIANGLES, pkg.vertexIndexBufferInf.value.length, gl.UNSIGNED_SHORT, 0); chk();
+                gl.drawElements(gl.TRIANGLES, param.VertexIndexBuffer.length, gl.UNSIGNED_SHORT, 0); chk();
             }
         }
         else {
