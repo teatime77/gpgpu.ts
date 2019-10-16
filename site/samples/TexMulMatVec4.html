@@ -87,7 +87,7 @@
         var gpgpu = CreateGPGPU();
 
         // 計算のパラメータ
-        var param = {
+        var pkg = {
             // idはプログラム内でユニークであれば何でも構いません。
             id: "TexMulMatVec4",
 
@@ -107,10 +107,10 @@
         };
 
         // パラメータを使い計算します。
-        gpgpu.compute(param);
+        gpgpu.compute(pkg);
 
         // WebGLのオブジェクトをクリアします。
-        gpgpu.clear(param);
+        gpgpu.clear(pkg);
 
         // 計算結果を表示します。
         document.body.insertAdjacentHTML("beforeend", "<p>A = <br/>" + MatStr(A, 2, 8, true) + "</p>");

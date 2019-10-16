@@ -560,7 +560,7 @@ export class Circle extends Drawable {
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
-        this.param = {
+        this.package = {
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
@@ -603,7 +603,7 @@ export class RegularIcosahedron extends Drawable {
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
-        this.param = {
+        this.package = {
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
@@ -649,7 +649,7 @@ export class GeodesicPolyhedron extends Drawable {
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
-        this.param = {
+        this.package = {
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
@@ -704,7 +704,7 @@ export class Cone extends ComponentDrawable {
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
-        this.param = {
+        this.package = {
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
@@ -759,7 +759,7 @@ export class Tube extends Drawable {
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
-        this.param = {
+        this.package = {
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
@@ -779,7 +779,7 @@ export class Pillar extends ComponentDrawable {
             (new Circle(colors[2], numDivision)).move(0, 0, -1),
         ];
 
-        this.param = null;
+        this.package = null;
     }
 }
 
@@ -891,7 +891,7 @@ export class Label extends Drawable {
         } as Mesh;
         
     
-        this.param = {
+        this.package = {
             id: `label${Drawable.count++}`,
             vertexShader: GPGPU.planeTextureVertexShader,//.textureSphereVertexShader,
             fragmentShader: GPGPU.planeTextureFragmentShader,//defaultFragmentShader,
@@ -914,11 +914,11 @@ export class ImageDrawable extends Drawable {
     }
 
     getParam() {
-        if (!this.param) {
+        if (!this.package) {
 
             var [mesh, idx_array] = makePlaneBuffers(new Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new TextureInfo(null, null, this.img));
 
-            this.param = {
+            this.package = {
                 id: "Earth",
                 vertexShader: GPGPU.textureSphereVertexShader,
                 fragmentShader: GPGPU.defaultFragmentShader,
@@ -927,6 +927,6 @@ export class ImageDrawable extends Drawable {
             } as any as Package;
         }
 
-        return this.param;
+        return this.package;
     }
 }

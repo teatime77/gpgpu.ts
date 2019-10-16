@@ -31,11 +31,11 @@ class MyDraw {
     }
 
     getParam() {
-        if (!this.param) {
+        if (!this.package) {
 
             var [mesh, idx_array] = makeEarthBuffers(new TextureInfo("vec4", null, this.img));
 
-            this.param = {
+            this.package = {
                 id: "Earth",
                 vertexShader: GPGPU.textureSphereVertexShader,
                 fragmentShader: GPGPU.defaultFragmentShader,
@@ -44,7 +44,7 @@ class MyDraw {
             };
         }
 
-        return this.param;
+        return this.package;
     }
 }
 

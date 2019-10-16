@@ -112,7 +112,7 @@ function Calc(gpgpu, size) {
     }
 
     //------------------------------------------------------------ 
-    var param = {
+    var pkg = {
         id: "MatMul",
         vertexShader: vertex_shader1
         ,
@@ -132,14 +132,14 @@ function Calc(gpgpu, size) {
             break;
         }
 
-        gpgpu.compute(param);
+        gpgpu.compute(pkg);
         cnt1++;
     }
-    gpgpu.clear(param);
+    gpgpu.clear(pkg);
 
 
     //------------------------------------------------------------ 
-    param = {
+    pkg = {
         id: "MatMul",
         vertexShader: vertex_shader2
         ,
@@ -158,10 +158,10 @@ function Calc(gpgpu, size) {
         if (1000 <= ms2) {
             break;
         }
-        gpgpu.compute(param);
+        gpgpu.compute(pkg);
         cnt2++;
     }
-    gpgpu.clear(param);
+    gpgpu.clear(pkg);
 
     //------------------------------------------------------------ 
 

@@ -38,7 +38,7 @@
     var C = new Float32Array(6);
 
     // 計算のパラメータ
-    var param = {
+    var pkg = {
         // idはプログラム内でユニークであれば何でも構いません。
         id: "UniMul",
 
@@ -57,10 +57,10 @@
     var gpgpu = CreateGPGPU();
 
     // パラメータを使い計算します。
-    gpgpu.compute(param);
+    gpgpu.compute(pkg);
 
     // WebGLのオブジェクトをクリアします。
-    gpgpu.clear(param);
+    gpgpu.clear(pkg);
 
     // 計算結果を表示します。
     document.body.insertAdjacentHTML("beforeend", "<p>A = " + A.join(' ') + "</p>");

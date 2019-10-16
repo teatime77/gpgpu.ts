@@ -30,11 +30,11 @@ class TextDrawable extends Drawable {
     }
 
     onDraw() {
-        if (!this.param) {
+        if (!this.package) {
 
             var [mesh, idx_array] = makePlaneBuffers(this.box, 11, 11, new TextureInfo(null, null, this.canvas_2d));
 
-            this.param = {
+            this.package = {
                 id: "label",
                 vertexShader: GPGPU.textureSphereVertexShader,
                 fragmentShader: GPGPU.defaultFragmentShader,
@@ -43,7 +43,7 @@ class TextDrawable extends Drawable {
             } as Package ;
         }
 
-        return this.param;
+        return this.package;
     }
 }
 
