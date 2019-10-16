@@ -552,7 +552,7 @@ export class Circle extends Drawable {
         vertexNormals.push(0, 0, 1);
     
         // 色の配列
-        let vertexColors = this.getVertexColors(color, vertices.length);
+        let vertexColors = this.getVertexColors(color, vertices.length / 3);
     
         let mesh = {
             vertexPosition: new Float32Array(vertices),
@@ -696,7 +696,7 @@ export class Cone extends ComponentDrawable {
         vertexNormals.push(0, 0, 1);
     
         // 色の配列
-        let vertexColors = this.getVertexColors(color, vertices.length);
+        let vertexColors = this.getVertexColors(color, vertices.length / 3);
     
         let mesh = {
             vertexPosition: new Float32Array(vertices),
@@ -739,6 +739,7 @@ export class Tube extends Drawable {
             vertices.push(x, y, -1);
 
             vertexNormals.push(x, y, 0);
+            vertexNormals.push(x, y, 0);
 
             let i1 = idx * 2
             let i2 = idx * 2 + 1;
@@ -750,7 +751,7 @@ export class Tube extends Drawable {
         }
     
         // 色の配列
-        let vertexColors = this.getVertexColors(color, vertices.length);
+        let vertexColors = this.getVertexColors(color, vertices.length / 3);
 
         let mesh = {
             vertexPosition: new Float32Array(vertices),

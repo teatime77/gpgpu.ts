@@ -110,7 +110,7 @@ export class Drawable {
     getVertexColors(color: Color, numVertex: number) : number[] {
         let vertexColors = [];
 
-        range(numVertex + 1).forEach(x => {
+        range(numVertex).forEach(x => {
             vertexColors.push(color.r, color.g, color.b, color.a);
         });
 
@@ -224,7 +224,6 @@ export class PackageParameter{
     fragmentShader: string;
     args: Map<string, Float32Array|TextureInfo>|Mesh;
     VertexIndexBuffer: Uint16Array | Uint32Array;
-    elementCount: number;
     program: WebGLProgram;
     transformFeedback: WebGLTransformFeedback;
     vertexIndexBufferInf: WebGLBuffer;
@@ -237,7 +236,6 @@ export class PackageParameter{
 
 export class Package{
     id: string;
-    elementCount: number;
 }
 
 /*
@@ -860,12 +858,12 @@ export class GPGPU {
             // 要素の個数
             var elemen_count = attrib.value.length / attrib_dim;
 
-            if (pkg.elementCount == undefined) {
+            if(param.attribElementCount == undefined){
+
                 param.attribElementCount = elemen_count;
             }
-            else {
-
-                assert(pkg.elementCount == elemen_count);
+            else{
+                console.assert(param.attribElementCount == elemen_count);
             }
 
             // バッファを作る。
@@ -1072,8 +1070,6 @@ export class GPGPU {
 
         // テクスチャを作る。
         this.makeTexture(pkg, param);
-
-        param.attribElementCount = param.elementCount;
 
         // attribute変数を作る。
         this.makeAttrib(pkg, param);
