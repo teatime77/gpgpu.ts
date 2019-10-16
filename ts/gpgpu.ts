@@ -234,10 +234,6 @@ export class PackageParameter{
     uniforms: ArgInf[];
 }
 
-export class Package{
-    id: string;
-}
-
 /*
     テクスチャ情報
 
@@ -523,7 +519,6 @@ export class GPGPU {
 
     canvas: HTMLCanvasElement;
     TEXTUREs: number[];
-    packages : Map<string, Package>;
     params: PackageParameter[] = [];
     drawables: Drawable[];
     drawParam: DrawParam;
@@ -566,9 +561,6 @@ export class GPGPU {
             throw "WebGL 2 is not available.";
         }
 
-        // パッケージのリストを初期化する。
-        this.packages = new Map<string, Package>();
-
         // 標準のシェーダの文字列をセットする。
         this.setStandardShaderString();
 
@@ -596,60 +588,55 @@ export class GPGPU {
         for(let param of this.params){
             this.clear(param);
         }
+        
+        this.params = [];
     }
 
     /*
         指定したidのWebGLのオブジェクトをすべて削除します。
     */
     clear(param: PackageParameter) {
-        let id: string = param.id;
-        var pkg = this.packages[id] as Package;
+        // 指定したidのパッケージがある場合
 
-        if (pkg) {
-            // 指定したidのパッケージがある場合
+        gl.bindBuffer(gl.ARRAY_BUFFER, null); chk();
 
-            delete this.packages[id]
+        if (param.vertexIndexBufferInf) {
 
-            gl.bindBuffer(gl.ARRAY_BUFFER, null); chk();
+            // バッファを削除する。
+            gl.deleteBuffer(param.vertexIndexBufferInf); chk();
+        }
 
-            if (param.vertexIndexBufferInf) {
+        // すべてのvarying変数に対し
+        for (let varying of param.varyings) {
+            if (varying.feedbackBuffer) {
+                // Transform Feedbackバッファがある場合
 
                 // バッファを削除する。
-                gl.deleteBuffer(param.vertexIndexBufferInf); chk();
+                gl.deleteBuffer(varying.feedbackBuffer); chk();
             }
-
-            // すべてのvarying変数に対し
-            for (let varying of param.varyings) {
-                if (varying.feedbackBuffer) {
-                    // Transform Feedbackバッファがある場合
-
-                    // バッファを削除する。
-                    gl.deleteBuffer(varying.feedbackBuffer); chk();
-                }
-            }
-
-            if (param.transformFeedback) {
-                // Transform Feedbackがある場合
-
-                gl.deleteTransformFeedback(param.transformFeedback); chk();
-            }
-
-            // テクスチャのバインドを解く。
-            gl.bindTexture(gl.TEXTURE_2D, null); chk();
-            gl.bindTexture(gl.TEXTURE_3D, null); chk();
-
-            // すべてのテクスチャを削除する。
-            param.textures.forEach(x => gl.deleteTexture(x.Texture), chk())
-
-            // プログラムを削除する。
-            gl.deleteProgram(param.program); chk();
         }
+
+        if (param.transformFeedback) {
+            // Transform Feedbackがある場合
+
+            gl.deleteTransformFeedback(param.transformFeedback); chk();
+        }
+
+        // テクスチャのバインドを解く。
+        gl.bindTexture(gl.TEXTURE_2D, null); chk();
+        gl.bindTexture(gl.TEXTURE_3D, null); chk();
+
+        // すべてのテクスチャを削除する。
+        param.textures.forEach(x => gl.deleteTexture(x.Texture), chk())
+
+        // プログラムを削除する。
+        gl.deleteProgram(param.program); chk();
     }
 
     /*
         シェーダのソースコードを解析します。
     */
-    parseShader(pkg: Package, param: PackageParameter) {
+    parseShader(param: PackageParameter) {
         // attribute変数、uniform変数、テクスチャ、varying変数の配列を初期化する。
         param.attributes = [];
         param.uniforms = [];
@@ -849,7 +836,7 @@ export class GPGPU {
     /*
         attribute変数を作ります。
     */
-    makeAttrib(pkg: Package, param: PackageParameter) {
+    makeAttrib(param: PackageParameter) {
         // すべてのattribute変数に対し
         for (let attrib of param.attributes) {
             // attribute変数の次元
@@ -883,7 +870,7 @@ export class GPGPU {
     /*
         テクスチャを作ります。
     */
-    makeTexture(pkg: Package, param: PackageParameter) {
+    makeTexture(param: PackageParameter) {
         // すべてのテクスチャに対し
         for (var i = 0; i < param.textures.length; i++) {
             var tex_inf = param.textures[i];
@@ -925,7 +912,7 @@ export class GPGPU {
     /*
         テクスチャのデータをセットします。
     */
-    setTextureData(pkg: Package, param: PackageParameter) {
+    setTextureData(param: PackageParameter) {
         for (var i = 0; i < param.textures.length; i++) {
             var tex_inf = param.textures[i];
 
@@ -999,7 +986,7 @@ export class GPGPU {
         }
     }
 
-    makeVertexIndexBuffer(pkg: Package, param: PackageParameter) {
+    makeVertexIndexBuffer(param: PackageParameter) {
         gl.clearColor(0.0, 0.0, 0.0, 1.0); chk();
         gl.enable(gl.DEPTH_TEST); chk();
 
@@ -1030,7 +1017,7 @@ export class GPGPU {
     /*
         ユニフォーム変数のロケーションをセットします。
     */
-    setUniformLocation(pkg: Package, param: PackageParameter) {
+    setUniformLocation(param: PackageParameter) {
         param.uniforms.forEach(u => u.locUniform = gl.getUniformLocation(param.program, u.name), chk());
     }
 
@@ -1038,11 +1025,6 @@ export class GPGPU {
         パッケージを作ります。
     */
     makePackage(param: PackageParameter) {
-        var pkg = new Package();
-        this.packages[param.id] = pkg;
-
-        pkg.id = param.id;
-
         if (!param.fragmentShader) {
             // フラグメントシェーダが指定されてない場合
 
@@ -1051,7 +1033,7 @@ export class GPGPU {
         }
 
         // シェーダのソースコードを解析する。
-        this.parseShader(pkg, param);
+        this.parseShader(param);
 
         // 頂点シェーダを作る。
         var vertex_shader = this.makeShader(gl.VERTEX_SHADER, param.vertexShader);
@@ -1066,13 +1048,13 @@ export class GPGPU {
         gl.useProgram(param.program); chk();
 
         // ユニフォーム変数のロケーションをセットします。
-        this.setUniformLocation(pkg, param);
+        this.setUniformLocation(param);
 
         // テクスチャを作る。
-        this.makeTexture(pkg, param);
+        this.makeTexture(param);
 
         // attribute変数を作る。
-        this.makeAttrib(pkg, param);
+        this.makeAttrib(param);
 
         if (param.varyings.length != 0) {
             //  varying変数がある場合
@@ -1095,16 +1077,14 @@ export class GPGPU {
         }
 
         if (param.VertexIndexBuffer) {
-            this.makeVertexIndexBuffer(pkg, param);
+            this.makeVertexIndexBuffer(param);
         }
-
-        return pkg;
     }
 
     /*
         attribute変数のデータをセットします。
     */
-    setAttribData(pkg: Package, param: PackageParameter) {
+    setAttribData(param: PackageParameter) {
         // すべてのattribute変数に対し
         for (let attrib of param.attributes) {
             var dim = this.vecDim(attrib.type);
@@ -1122,7 +1102,7 @@ export class GPGPU {
     /*
         uniform変数のデータをセットします。
     */
-    setUniformsData(pkg: Package, param: PackageParameter) {
+    setUniformsData(param: PackageParameter) {
         // すべてのuniform変数に対し
         for (let u of param.uniforms) {
             if (u.value instanceof Float32Array) {
@@ -1170,7 +1150,7 @@ export class GPGPU {
     /*
         パラメータの引数の値をコピーします。
     */
-    copyParamArgsValue(param: PackageParameter, pkg: Package){
+    copyParamArgsValue(param: PackageParameter){
         for(let args of[ param.attributes, param.uniforms, param.textures, param.varyings ]) {
             for (let arg of args) {
                 var val = param.args[arg.name];
@@ -1193,12 +1173,11 @@ export class GPGPU {
         計算します。
     */
     compute(param: PackageParameter, drawable: Drawable = undefined) {
-        var pkg = this.packages[param.id] as Package;
-        if (!pkg) {
+        if (param.program == undefined) {
             // パッケージが未作成の場合
 
             // パッケージを作る。
-            pkg = this.makePackage(param);
+            this.makePackage(param);
         }
         else {
 
@@ -1206,18 +1185,18 @@ export class GPGPU {
         }
 
         // 実引数の値をコピーする。
-        this.copyParamArgsValue(param, pkg);
+        this.copyParamArgsValue(param);
 
         // attribute変数の値をセットする。
-        this.setAttribData(pkg, param);
+        this.setAttribData(param);
 
         gl.useProgram(param.program); chk();
 
         // テクスチャの値のセットする。
-        this.setTextureData(pkg, param);
+        this.setTextureData(param);
 
         // ユニフォーム変数の値をセットする。
-        this.setUniformsData(pkg, param);
+        this.setUniformsData(param);
 
         if (param.varyings.length == 0) {
             //  描画する場合

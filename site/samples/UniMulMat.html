@@ -79,7 +79,7 @@
     gpgpu.compute(param);
 
     // WebGLのオブジェクトをクリアします。
-    gpgpu.clear(param.id);
+    gpgpu.clear(param);
 
     // 計算結果を表示します。
     document.body.insertAdjacentHTML("beforeend", "<p>A = <br/>[" + A.slice(0, 3).join(' ') + "]<br/>[" + A.slice(3, 6).join(' ') + "]</p>");
