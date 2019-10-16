@@ -136,17 +136,15 @@ export class Drawable {
 
 
 export class Points extends Drawable {
-    constructor(vertices: Vertex[], color: Color, pointSize: number){
+    constructor(points: Float32Array, color: Color, pointSize: number){
         super();
     
         // 色の配列
-        let vertexColors = this.getVertexColors(color, vertices.length);
+        let vertexColors = this.getVertexColors(color, points.length / 3);
     
-        const positions : number[] = [];
-        vertices.forEach(p => positions.push(p.x, p.y, p.z));
 
         let mesh = {
-            vertexPosition: new Float32Array(positions),
+            vertexPosition: points,
             vertexColor: new Float32Array(vertexColors),
             pointSize  : pointSize
         } as any as Mesh;
@@ -156,23 +154,36 @@ export class Points extends Drawable {
             vertexShader: VertexShader.points,
             fragmentShader: FragmentShader.points,
             args: mesh,
-            VertexIndexBuffer: new Uint16Array(range(vertices.length))
+            VertexIndexBuffer: new Uint16Array(range(points.length / 3))
         } as any as PackageParameter;
     }
 
-    update(vertices: Vertex[], color: Color, pointSize: number){
-        // 色の配列
-        let vertexColors = this.getVertexColors(color, vertices.length);
-    
-        const positions : number[] = [];
-        vertices.forEach(p => positions.push(p.x, p.y, p.z));
+    makeVertexPosition(vertices: Vertex[]) : Float32Array {
+        const positions = new Float32Array(3 * vertices.length);
 
+        let base = 0;
+        for(let i = 0; i < vertices.length; i++){
+            let p = vertices[i];
+            positions[base    ] = p.x;
+            positions[base + 1] = p.y;
+            positions[base + 2] = p.z;
+
+            base += 3;
+        }
+
+        return positions;
+    }
+
+    update(points: Float32Array, color: Color, pointSize: number){
+        // 色の配列
+        let vertexColors = this.getVertexColors(color, points.length / 3);
+    
         let mesh = this.param.args as Mesh;
-        mesh.vertexPosition = new Float32Array(positions);
+        mesh.vertexPosition = points;
         mesh.vertexColor = new Float32Array(vertexColors);
         mesh.pointSize = pointSize;
-        
-        this.param.VertexIndexBuffer = new Uint16Array(range(vertices.length));
+
+        this.param.VertexIndexBuffer = new Uint16Array(range(points.length / 3));
     }
 }
 
@@ -518,6 +529,7 @@ export class GPGPU {
     drawables: Drawable[];
     drawParam: DrawParam;
     ui3D : UI3D;
+    pending: boolean;
 
     /*
         GPGPUのコンストラクタ
@@ -1355,6 +1367,8 @@ export class GPGPU {
 
         // 次の再描画でdrawSceneが呼ばれるようにする。
         window.requestAnimationFrame(this.drawScene.bind(this));
+
+        this.pending = false;
     }
 
     /*
