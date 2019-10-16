@@ -1,4 +1,4 @@
-﻿import {TextureInfo, Mesh, Drawable, range, PackageParameter, GPGPU} from "./gpgpu.js"
+﻿import {TextureInfo, Mesh, Drawable, range, Package, GPGPU} from "./gpgpu.js"
 import { ComponentDrawable, Vertex, Color } from "./gpgpu.js";
 
 export class Box {
@@ -566,7 +566,7 @@ export class Circle extends Drawable {
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as PackageParameter;
+        } as any as Package;
     }
 }
 
@@ -609,7 +609,7 @@ export class RegularIcosahedron extends Drawable {
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as PackageParameter;
+        } as any as Package;
     }
 }
 
@@ -655,7 +655,7 @@ export class GeodesicPolyhedron extends Drawable {
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as PackageParameter;
+        } as any as Package;
     }
 }
 
@@ -710,7 +710,7 @@ export class Cone extends ComponentDrawable {
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as PackageParameter;
+        } as any as Package;
 
         this.children = [];
     }
@@ -765,7 +765,7 @@ export class Tube extends Drawable {
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as PackageParameter;
+        } as any as Package;
     }
 }
 
@@ -897,7 +897,7 @@ export class Label extends Drawable {
             fragmentShader: GPGPU.planeTextureFragmentShader,//defaultFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as PackageParameter;
+        } as any as Package;
 
     }
 }
@@ -924,7 +924,7 @@ export class ImageDrawable extends Drawable {
                 fragmentShader: GPGPU.defaultFragmentShader,
                 args: mesh,
                 VertexIndexBuffer: idx_array
-            } as any as PackageParameter;
+            } as any as Package;
         }
 
         return this.param;

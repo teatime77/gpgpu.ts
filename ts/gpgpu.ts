@@ -99,7 +99,7 @@ export class Color {
 
 export class Drawable {
     static count = 0;
-    param: PackageParameter;
+    param: Package;
     transform: Float32Array;
 
     constructor(){
@@ -155,7 +155,7 @@ export class Points extends Drawable {
             fragmentShader: FragmentShader.points,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(range(points.length / 3))
-        } as any as PackageParameter;
+        } as any as Package;
     }
 
     makeVertexPosition(vertices: Vertex[]) : Float32Array {
@@ -209,7 +209,7 @@ export class Lines extends Drawable {
             fragmentShader: FragmentShader.points,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(range(vertices.length))
-        } as any as PackageParameter;
+        } as any as Package;
     }
 }
 
@@ -218,7 +218,7 @@ export class ComponentDrawable extends Drawable {
 
 }
 
-export class PackageParameter{
+export class Package{
     id: string;
     vertexShader: string;
     fragmentShader: string;
@@ -519,7 +519,7 @@ export class GPGPU {
 
     canvas: HTMLCanvasElement;
     TEXTUREs: number[];
-    params: PackageParameter[] = [];
+    params: Package[] = [];
     drawables: Drawable[];
     drawParam: DrawParam;
     ui3D : UI3D;
@@ -588,14 +588,14 @@ export class GPGPU {
         for(let param of this.params){
             this.clear(param);
         }
-        
+
         this.params = [];
     }
 
     /*
         指定したidのWebGLのオブジェクトをすべて削除します。
     */
-    clear(param: PackageParameter) {
+    clear(param: Package) {
         // 指定したidのパッケージがある場合
 
         gl.bindBuffer(gl.ARRAY_BUFFER, null); chk();
@@ -636,7 +636,7 @@ export class GPGPU {
     /*
         シェーダのソースコードを解析します。
     */
-    parseShader(param: PackageParameter) {
+    parseShader(param: Package) {
         // attribute変数、uniform変数、テクスチャ、varying変数の配列を初期化する。
         param.attributes = [];
         param.uniforms = [];
@@ -836,7 +836,7 @@ export class GPGPU {
     /*
         attribute変数を作ります。
     */
-    makeAttrib(param: PackageParameter) {
+    makeAttrib(param: Package) {
         // すべてのattribute変数に対し
         for (let attrib of param.attributes) {
             // attribute変数の次元
@@ -870,7 +870,7 @@ export class GPGPU {
     /*
         テクスチャを作ります。
     */
-    makeTexture(param: PackageParameter) {
+    makeTexture(param: Package) {
         // すべてのテクスチャに対し
         for (var i = 0; i < param.textures.length; i++) {
             var tex_inf = param.textures[i];
@@ -912,7 +912,7 @@ export class GPGPU {
     /*
         テクスチャのデータをセットします。
     */
-    setTextureData(param: PackageParameter) {
+    setTextureData(param: Package) {
         for (var i = 0; i < param.textures.length; i++) {
             var tex_inf = param.textures[i];
 
@@ -986,7 +986,7 @@ export class GPGPU {
         }
     }
 
-    makeVertexIndexBuffer(param: PackageParameter) {
+    makeVertexIndexBuffer(param: Package) {
         gl.clearColor(0.0, 0.0, 0.0, 1.0); chk();
         gl.enable(gl.DEPTH_TEST); chk();
 
@@ -1017,14 +1017,14 @@ export class GPGPU {
     /*
         ユニフォーム変数のロケーションをセットします。
     */
-    setUniformLocation(param: PackageParameter) {
+    setUniformLocation(param: Package) {
         param.uniforms.forEach(u => u.locUniform = gl.getUniformLocation(param.program, u.name), chk());
     }
 
     /*
         パッケージを作ります。
     */
-    makePackage(param: PackageParameter) {
+    makePackage(param: Package) {
         if (!param.fragmentShader) {
             // フラグメントシェーダが指定されてない場合
 
@@ -1084,7 +1084,7 @@ export class GPGPU {
     /*
         attribute変数のデータをセットします。
     */
-    setAttribData(param: PackageParameter) {
+    setAttribData(param: Package) {
         // すべてのattribute変数に対し
         for (let attrib of param.attributes) {
             var dim = this.vecDim(attrib.type);
@@ -1102,7 +1102,7 @@ export class GPGPU {
     /*
         uniform変数のデータをセットします。
     */
-    setUniformsData(param: PackageParameter) {
+    setUniformsData(param: Package) {
         // すべてのuniform変数に対し
         for (let u of param.uniforms) {
             if (u.value instanceof Float32Array) {
@@ -1150,7 +1150,7 @@ export class GPGPU {
     /*
         パラメータの引数の値をコピーします。
     */
-    copyParamArgsValue(param: PackageParameter){
+    copyParamArgsValue(param: Package){
         for(let args of[ param.attributes, param.uniforms, param.textures, param.varyings ]) {
             for (let arg of args) {
                 var val = param.args[arg.name];
@@ -1172,7 +1172,7 @@ export class GPGPU {
     /*
         計算します。
     */
-    compute(param: PackageParameter, drawable: Drawable = undefined) {
+    compute(param: Package, drawable: Drawable = undefined) {
         if (param.program == undefined) {
             // パッケージが未作成の場合
 

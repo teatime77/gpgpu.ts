@@ -1,4 +1,4 @@
-import {Drawable, range, GPGPU, TextureInfo, PackageParameter, CreateGPGPU, Color, Points, Lines, Vertex} from "./gpgpu.js";
+import {Drawable, range, GPGPU, TextureInfo, Package, CreateGPGPU, Color, Points, Lines, Vertex} from "./gpgpu.js";
 import { makePlaneBuffers, ImageDrawable, Circle, Tube, Pillar, Cone, RegularIcosahedron, GeodesicPolyhedron, Label, Box } from "./shape.js";
 
 let mygpgpu;
@@ -40,7 +40,7 @@ class TextDrawable extends Drawable {
                 fragmentShader: GPGPU.defaultFragmentShader,
                 args: mesh as any as Map<string, Float32Array|TextureInfo>,
                 VertexIndexBuffer: idx_array
-            } as PackageParameter ;
+            } as Package ;
         }
 
         return this.param;
