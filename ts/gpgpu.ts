@@ -226,18 +226,18 @@ export class PackageParameter{
     VertexIndexBuffer: Uint16Array | Uint32Array;
     elementCount: number;
     program: WebGLProgram;
-}
-
-export class Package{
-    id: string;
     transformFeedback: WebGLTransformFeedback;
     vertexIndexBufferInf: WebGLBuffer;
     textures: TextureInfo[];
     attribElementCount: number;
-    elementCount: number;
     varyings: ArgInf[];
     attributes: ArgInf[];
     uniforms: ArgInf[];
+}
+
+export class Package{
+    id: string;
+    elementCount: number;
 }
 
 /*
@@ -614,14 +614,14 @@ export class GPGPU {
 
             gl.bindBuffer(gl.ARRAY_BUFFER, null); chk();
 
-            if (pkg.vertexIndexBufferInf) {
+            if (param.vertexIndexBufferInf) {
 
                 // バッファを削除する。
-                gl.deleteBuffer(pkg.vertexIndexBufferInf); chk();
+                gl.deleteBuffer(param.vertexIndexBufferInf); chk();
             }
 
             // すべてのvarying変数に対し
-            for (let varying of pkg.varyings) {
+            for (let varying of param.varyings) {
                 if (varying.feedbackBuffer) {
                     // Transform Feedbackバッファがある場合
 
@@ -630,10 +630,10 @@ export class GPGPU {
                 }
             }
 
-            if (pkg.transformFeedback) {
+            if (param.transformFeedback) {
                 // Transform Feedbackがある場合
 
-                gl.deleteTransformFeedback(pkg.transformFeedback); chk();
+                gl.deleteTransformFeedback(param.transformFeedback); chk();
             }
 
             // テクスチャのバインドを解く。
@@ -641,7 +641,7 @@ export class GPGPU {
             gl.bindTexture(gl.TEXTURE_3D, null); chk();
 
             // すべてのテクスチャを削除する。
-            pkg.textures.forEach(x => gl.deleteTexture(x.Texture), chk())
+            param.textures.forEach(x => gl.deleteTexture(x.Texture), chk())
 
             // プログラムを削除する。
             gl.deleteProgram(param.program); chk();
@@ -653,10 +653,10 @@ export class GPGPU {
     */
     parseShader(pkg: Package, param: PackageParameter) {
         // attribute変数、uniform変数、テクスチャ、varying変数の配列を初期化する。
-        pkg.attributes = [];
-        pkg.uniforms = [];
-        pkg.textures = [];
-        pkg.varyings = [];
+        param.attributes = [];
+        param.uniforms = [];
+        param.textures = [];
+        param.varyings = [];
 
         // 頂点シェーダとフラグメントシェーダのソースに対し
         for(let shader_text of[ param.vertexShader,  param.fragmentShader ]) {
@@ -750,7 +750,7 @@ export class GPGPU {
                     tex_inf.isArray = is_array;
 
                     // テクスチャの配列に追加する。
-                    pkg.textures.push(tex_inf);
+                    param.textures.push(tex_inf);
                 }
                 else {
                     // テクスチャのsamplerでない場合
@@ -762,19 +762,19 @@ export class GPGPU {
                         case "in":
                             // attribute変数の場合
 
-                            pkg.attributes.push(arg_inf);
+                            param.attributes.push(arg_inf);
                             break;
 
                         case "uniform":
                             // uniform変数の場合
 
-                            pkg.uniforms.push(arg_inf);
+                            param.uniforms.push(arg_inf);
                             break;
 
                         case "out":
                             // varying変数の場合
 
-                            pkg.varyings.push(arg_inf);
+                            param.varyings.push(arg_inf);
                             break;
                     }
                 }
@@ -853,7 +853,7 @@ export class GPGPU {
     */
     makeAttrib(pkg: Package, param: PackageParameter) {
         // すべてのattribute変数に対し
-        for (let attrib of pkg.attributes) {
+        for (let attrib of param.attributes) {
             // attribute変数の次元
             var attrib_dim = this.vecDim(attrib.type);
 
@@ -861,7 +861,7 @@ export class GPGPU {
             var elemen_count = attrib.value.length / attrib_dim;
 
             if (pkg.elementCount == undefined) {
-                pkg.attribElementCount = elemen_count;
+                param.attribElementCount = elemen_count;
             }
             else {
 
@@ -887,8 +887,8 @@ export class GPGPU {
     */
     makeTexture(pkg: Package, param: PackageParameter) {
         // すべてのテクスチャに対し
-        for (var i = 0; i < pkg.textures.length; i++) {
-            var tex_inf = pkg.textures[i];
+        for (var i = 0; i < param.textures.length; i++) {
+            var tex_inf = param.textures[i];
 
             // テクスチャのuniform変数の位置
             tex_inf.locTexture = gl.getUniformLocation(param.program, tex_inf.name); chk();
@@ -927,9 +927,9 @@ export class GPGPU {
     /*
         テクスチャのデータをセットします。
     */
-    setTextureData(pkg: Package) {
-        for (var i = 0; i < pkg.textures.length; i++) {
-            var tex_inf = pkg.textures[i];
+    setTextureData(pkg: Package, param: PackageParameter) {
+        for (var i = 0; i < param.textures.length; i++) {
+            var tex_inf = param.textures[i];
 
             // テクスチャのuniform変数にテクスチャの番号をセットする。
             gl.uniform1i(tex_inf.locTexture, i); chk();
@@ -1005,9 +1005,9 @@ export class GPGPU {
         gl.clearColor(0.0, 0.0, 0.0, 1.0); chk();
         gl.enable(gl.DEPTH_TEST); chk();
 
-        pkg.vertexIndexBufferInf = gl.createBuffer(); chk();
+        param.vertexIndexBufferInf = gl.createBuffer(); chk();
 
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf); chk();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, param.vertexIndexBufferInf); chk();
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, param.VertexIndexBuffer, gl.STATIC_DRAW); chk();
     }
 
@@ -1033,7 +1033,7 @@ export class GPGPU {
         ユニフォーム変数のロケーションをセットします。
     */
     setUniformLocation(pkg: Package, param: PackageParameter) {
-        pkg.uniforms.forEach(u => u.locUniform = gl.getUniformLocation(param.program, u.name), chk());
+        param.uniforms.forEach(u => u.locUniform = gl.getUniformLocation(param.program, u.name), chk());
     }
 
     /*
@@ -1062,7 +1062,7 @@ export class GPGPU {
         var fragment_shader = this.makeShader(gl.FRAGMENT_SHADER, param.fragmentShader);
 
         // プログラムを作る。
-        param.program = this.makeProgram(vertex_shader, fragment_shader, pkg.varyings);
+        param.program = this.makeProgram(vertex_shader, fragment_shader, param.varyings);
 
         // プログラムを使用する。
         gl.useProgram(param.program); chk();
@@ -1073,17 +1073,17 @@ export class GPGPU {
         // テクスチャを作る。
         this.makeTexture(pkg, param);
 
-        pkg.attribElementCount = param.elementCount;
+        param.attribElementCount = param.elementCount;
 
         // attribute変数を作る。
         this.makeAttrib(pkg, param);
 
-        if (pkg.varyings.length != 0) {
+        if (param.varyings.length != 0) {
             //  varying変数がある場合
 
             // すべてのvarying変数に対し
-            for (let varying of pkg.varyings) {
-                var out_buffer_size = this.vecDim(varying.type) * pkg.attribElementCount * Float32Array.BYTES_PER_ELEMENT;
+            for (let varying of param.varyings) {
+                var out_buffer_size = this.vecDim(varying.type) * param.attribElementCount * Float32Array.BYTES_PER_ELEMENT;
 
                 // Transform Feedbackバッファを作る。
                 varying.feedbackBuffer = gl.createBuffer(); chk();
@@ -1095,7 +1095,7 @@ export class GPGPU {
             }
 
             // Transform Feedbackを作る。
-            pkg.transformFeedback = gl.createTransformFeedback(); chk();
+            param.transformFeedback = gl.createTransformFeedback(); chk();
         }
 
         if (param.VertexIndexBuffer) {
@@ -1108,9 +1108,9 @@ export class GPGPU {
     /*
         attribute変数のデータをセットします。
     */
-    setAttribData(pkg: Package) {
+    setAttribData(pkg: Package, param: PackageParameter) {
         // すべてのattribute変数に対し
-        for (let attrib of pkg.attributes) {
+        for (let attrib of param.attributes) {
             var dim = this.vecDim(attrib.type);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, attrib.AttribBuffer); chk();
@@ -1126,9 +1126,9 @@ export class GPGPU {
     /*
         uniform変数のデータをセットします。
     */
-    setUniformsData(pkg: Package) {
+    setUniformsData(pkg: Package, param: PackageParameter) {
         // すべてのuniform変数に対し
-        for (let u of pkg.uniforms) {
+        for (let u of param.uniforms) {
             if (u.value instanceof Float32Array) {
                 // 値が配列の場合
 
@@ -1175,11 +1175,11 @@ export class GPGPU {
         パラメータの引数の値をコピーします。
     */
     copyParamArgsValue(param: PackageParameter, pkg: Package){
-        for(let args of[ pkg.attributes, pkg.uniforms, pkg.textures, pkg.varyings ]) {
+        for(let args of[ param.attributes, param.uniforms, param.textures, param.varyings ]) {
             for (let arg of args) {
                 var val = param.args[arg.name];
                 assert(val != undefined);
-                if (args == pkg.textures) {
+                if (args == param.textures) {
                     // テクスチャ情報の場合
 
                     arg.value = val.value;
@@ -1213,23 +1213,23 @@ export class GPGPU {
         this.copyParamArgsValue(param, pkg);
 
         // attribute変数の値をセットする。
-        this.setAttribData(pkg);
+        this.setAttribData(pkg, param);
 
         gl.useProgram(param.program); chk();
 
         // テクスチャの値のセットする。
-        this.setTextureData(pkg);
+        this.setTextureData(pkg, param);
 
         // ユニフォーム変数の値をセットする。
-        this.setUniformsData(pkg);
+        this.setUniformsData(pkg, param);
 
-        if (pkg.varyings.length == 0) {
+        if (param.varyings.length == 0) {
             //  描画する場合
 
             gl.viewport(0, 0, this.canvas.width, this.canvas.height); chk();
 
             // 頂点インデックスバッファをバインドする。
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf); chk();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, param.vertexIndexBufferInf); chk();
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, param.VertexIndexBuffer, gl.STATIC_DRAW); chk();
 
             if(drawable instanceof Points){
@@ -1255,11 +1255,11 @@ export class GPGPU {
             gl.enable(gl.RASTERIZER_DISCARD); chk();
 
             // Transform Feedbackをバインドする。
-            gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, pkg.transformFeedback); chk();
+            gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, param.transformFeedback); chk();
 
             // すべてのvarying変数に対し
-            for (var i = 0; i < pkg.varyings.length; i++) {
-                var varying = pkg.varyings[i];
+            for (var i = 0; i < param.varyings.length; i++) {
+                var varying = param.varyings[i];
 
                 // Transform Feedbackのバッファをバインドする。
                 gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, i, varying.feedbackBuffer); chk();
@@ -1269,7 +1269,7 @@ export class GPGPU {
             gl.beginTransformFeedback(gl.POINTS); chk();    // TRIANGLES
 
             // 点ごとの描画をする。
-            gl.drawArrays(gl.POINTS, 0, pkg.attribElementCount); chk();
+            gl.drawArrays(gl.POINTS, 0, param.attribElementCount); chk();
 
             // Transform Feedbackを終了する。
             gl.endTransformFeedback(); chk();
@@ -1278,8 +1278,8 @@ export class GPGPU {
             gl.disable(gl.RASTERIZER_DISCARD); chk();
 
             // すべてのvarying変数に対し
-            for (var i = 0; i < pkg.varyings.length; i++) {
-                varying = pkg.varyings[i];
+            for (var i = 0; i < param.varyings.length; i++) {
+                varying = param.varyings[i];
 
                 // Transform Feedbackのバッファのバインドを解く。
                 gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, i, null); chk();
