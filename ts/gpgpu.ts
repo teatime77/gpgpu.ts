@@ -225,11 +225,11 @@ export class PackageParameter{
     args: Map<string, Float32Array|TextureInfo>|Mesh;
     VertexIndexBuffer: Uint16Array | Uint32Array;
     elementCount: number;
+    program: WebGLProgram;
 }
 
 export class Package{
     id: string;
-    program: WebGLProgram;
     transformFeedback: WebGLTransformFeedback;
     vertexIndexBufferInf: WebGLBuffer;
     textures: TextureInfo[];
@@ -526,6 +526,7 @@ export class GPGPU {
     canvas: HTMLCanvasElement;
     TEXTUREs: number[];
     packages : Map<string, Package>;
+    params: PackageParameter[] = [];
     drawables: Drawable[];
     drawParam: DrawParam;
     ui3D : UI3D;
@@ -594,17 +595,17 @@ export class GPGPU {
         WebGLのオブジェクトをすべて削除します。
     */
     clearAll() {
-        var packages = Object.assign({}, this.packages);
-        for (var id in packages) {
-            this.clear(id);
+        for(let param of this.params){
+            this.clear(param);
         }
     }
 
     /*
         指定したidのWebGLのオブジェクトをすべて削除します。
     */
-    clear(id: string) {
-        var pkg = this.packages[id];
+    clear(param: PackageParameter) {
+        let id: string = param.id;
+        var pkg = this.packages[id] as Package;
 
         if (pkg) {
             // 指定したidのパッケージがある場合
@@ -613,10 +614,10 @@ export class GPGPU {
 
             gl.bindBuffer(gl.ARRAY_BUFFER, null); chk();
 
-            if (pkg.idxBuffer) {
+            if (pkg.vertexIndexBufferInf) {
 
                 // バッファを削除する。
-                gl.deleteBuffer(pkg.idxBuffer); chk();
+                gl.deleteBuffer(pkg.vertexIndexBufferInf); chk();
             }
 
             // すべてのvarying変数に対し
@@ -643,7 +644,7 @@ export class GPGPU {
             pkg.textures.forEach(x => gl.deleteTexture(x.Texture), chk())
 
             // プログラムを削除する。
-            gl.deleteProgram(pkg.program); chk();
+            gl.deleteProgram(param.program); chk();
         }
     }
 
@@ -850,7 +851,7 @@ export class GPGPU {
     /*
         attribute変数を作ります。
     */
-    makeAttrib(pkg: Package) {
+    makeAttrib(pkg: Package, param: PackageParameter) {
         // すべてのattribute変数に対し
         for (let attrib of pkg.attributes) {
             // attribute変数の次元
@@ -871,26 +872,26 @@ export class GPGPU {
             attrib.AttribBuffer = gl.createBuffer();
 
             // attribute変数の位置
-            attrib.AttribLoc = gl.getAttribLocation(pkg.program, attrib.name); chk();
+            attrib.AttribLoc = gl.getAttribLocation(param.program, attrib.name); chk();
 
             // 指定した位置のattribute配列を有効にする。
             gl.enableVertexAttribArray(attrib.AttribLoc); chk();
 
             // attribute変数の位置と変数名をバインドする。
-            gl.bindAttribLocation(pkg.program, attrib.AttribLoc, attrib.name);
+            gl.bindAttribLocation(param.program, attrib.AttribLoc, attrib.name);
         }
     }
 
     /*
         テクスチャを作ります。
     */
-    makeTexture(pkg: Package) {
+    makeTexture(pkg: Package, param: PackageParameter) {
         // すべてのテクスチャに対し
         for (var i = 0; i < pkg.textures.length; i++) {
             var tex_inf = pkg.textures[i];
 
             // テクスチャのuniform変数の位置
-            tex_inf.locTexture = gl.getUniformLocation(pkg.program, tex_inf.name); chk();
+            tex_inf.locTexture = gl.getUniformLocation(param.program, tex_inf.name); chk();
 
             var dim = tex_inf.samplerType == "sampler3D" ? gl.TEXTURE_3D : gl.TEXTURE_2D;
 
@@ -1031,8 +1032,8 @@ export class GPGPU {
     /*
         ユニフォーム変数のロケーションをセットします。
     */
-    setUniformLocation(pkg: Package) {
-        pkg.uniforms.forEach(u => u.locUniform = gl.getUniformLocation(pkg.program, u.name), chk());
+    setUniformLocation(pkg: Package, param: PackageParameter) {
+        pkg.uniforms.forEach(u => u.locUniform = gl.getUniformLocation(param.program, u.name), chk());
     }
 
     /*
@@ -1061,21 +1062,21 @@ export class GPGPU {
         var fragment_shader = this.makeShader(gl.FRAGMENT_SHADER, param.fragmentShader);
 
         // プログラムを作る。
-        pkg.program = this.makeProgram(vertex_shader, fragment_shader, pkg.varyings);
+        param.program = this.makeProgram(vertex_shader, fragment_shader, pkg.varyings);
 
         // プログラムを使用する。
-        gl.useProgram(pkg.program); chk();
+        gl.useProgram(param.program); chk();
 
         // ユニフォーム変数のロケーションをセットします。
-        this.setUniformLocation(pkg);
+        this.setUniformLocation(pkg, param);
 
         // テクスチャを作る。
-        this.makeTexture(pkg);
+        this.makeTexture(pkg, param);
 
         pkg.attribElementCount = param.elementCount;
 
         // attribute変数を作る。
-        this.makeAttrib(pkg);
+        this.makeAttrib(pkg, param);
 
         if (pkg.varyings.length != 0) {
             //  varying変数がある場合
@@ -1205,7 +1206,7 @@ export class GPGPU {
         }
         else {
 
-            gl.useProgram(pkg.program); chk();
+            gl.useProgram(param.program); chk();
         }
 
         // 実引数の値をコピーする。
@@ -1214,7 +1215,7 @@ export class GPGPU {
         // attribute変数の値をセットする。
         this.setAttribData(pkg);
 
-        gl.useProgram(pkg.program); chk();
+        gl.useProgram(param.program); chk();
 
         // テクスチャの値のセットする。
         this.setTextureData(pkg);
