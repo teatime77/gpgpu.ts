@@ -65,7 +65,7 @@ export function testBodyOnLoad(){
             (new Tube(new Color(0,1,0,1), 20)).scale(0.1, 0.1, 2).move(-1, 0, 0),
             (new Pillar([Color.red, Color.green, Color.blue], 20)).scale(0.1, 0.1, 1).move(0, 3, 0),
             (new Cone(Color.red, 20)).scale(0.2, 0.2, 1).move(2, 0, 0.5),
-            new Points(new Float32Array([1.5, -1.3, 0, -1.5, -1.3, 0]), Color.red, 5),
+            new Points(new Float32Array([1.5, -1.3, 0, -1.5, -1.3, 0]), new Float32Array([1,0,0,1, 0,0,1,1]), 5),
             new Lines([{x:1.5,y:-1.5,z:0} as Vertex,{x:-1.5,y:-1.5,z:0} as Vertex], Color.blue),
             (new RegularIcosahedron(new Color(0,1,0,1))).scale(0.3, 0.3, 0.3).move(2, -2, 0),
             (new GeodesicPolyhedron(new Color(0,0,1,1), 1)).scale(0.3, 0.3, 0.3).move(3,  2, 0),

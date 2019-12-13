@@ -136,16 +136,12 @@ export class Drawable {
 
 
 export class Points extends Drawable {
-    constructor(points: Float32Array, color: Color, pointSize: number){
+    constructor(points: Float32Array, colors: Float32Array, pointSize: number){
         super();
     
-        // 色の配列
-        let vertexColors = this.getVertexColors(color, points.length / 3);
-    
-
         let mesh = {
             vertexPosition: points,
-            vertexColor: new Float32Array(vertexColors),
+            vertexColor: colors,
             pointSize  : pointSize
         } as any as Mesh;
             
@@ -319,8 +315,8 @@ export class UI3D {
             }
             else{
 
-                drawParam.xRot += (newY - this.lastMouseY) / 300;
-                drawParam.yRot += (newX - this.lastMouseX) / 300;
+                drawParam.xRot += (newY - this.lastMouseY) / 100;
+                drawParam.yRot += (newX - this.lastMouseX) / 100;
             }
         }
 
