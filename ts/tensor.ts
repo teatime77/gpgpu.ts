@@ -660,14 +660,11 @@ class ConvTranspose2d extends Module {
         this.padding = obj['padding'];
         this.stride = obj['stride'];
         this.groups = obj['groups'];
-
-        // log(`${this.name} ${this.type} ${this.weight.shape_last()} ${this.padding} ${this.stride} ${this.groups}`)
     }
 
     *forward(pack: [Tensor, Tensor]){
         let [x, style] = pack;
-        let [N, iC, H, W] = x.shape
-        // let [N2, iC2, oC, kH, kW] = this.weight.shape;
+        let [N, iC, H, W] = x.shape;
         let [N2, oC, iC2, kH, kW] = this.weight.shape;
 
         console.assert(N == N2 && iC == iC2);
@@ -685,14 +682,11 @@ class ConvTranspose2d extends Module {
 
         let modulated_weight = this.weight.mul(mod_rates.view(N,1,iC,1,1));
 
-        // log(`FW ${this.name} ${this.type} mod_rates:${this.diff(mod_rates, 'mod_rates')} modulated_weight:${this.diff(modulated_weight, 'modulated_weight')}`);
-
         let weight: Tensor;
         if(this.demodulate){
             let demod_norm = modulated_weight.square().sum([2,3,4]).add(1e-8).sqrt().map(x => 1 / x) // (N, oC)
             weight = modulated_weight.mul(demod_norm.view(N, oC, 1, 1, 1)); // (N,oC,iC,kH,kW)
 
-            // log(`    demod_norm:${this.diff(demod_norm, 'demod_norm')} weight:${this.diff(weight, 'weight_out')}`);
         }
         else{
 
@@ -707,8 +701,6 @@ class ConvTranspose2d extends Module {
         let [dim1, dim2, Hp1, Wp1] = y.shape;
         y = y.view(N, oC, Hp1, Wp1);
 
-        // log(`    ys: ${y.at(0,510,5,6)} ${y.at(0,510,6,5)} ${y.at(0,511,8,7)} ${y.at(0,511,7,8)}`);
-        // log(`    y:${this.diff(y)}`);
         yield y;
     }
 
@@ -726,21 +718,24 @@ class ConvTranspose2d extends Module {
         let oW = (iW - 1) * stride + (kW - 1) + 1;
 
         this.nCalc = (oC * oH * oW) * (iC * kH * kW);
-        this.gpuShape = `[${oC} ${oH} ${oW} x ${iC} ${kH} ${kW}]`;
 
-        let oCmini;
-        if(10 * 10000 * 10000 < this.nCalc){
+        let iCmini = iC;
 
-            console.assert(oC % 8 == 0);
-            oCmini = oC / 8;
+        let cache_mem = 5 * 1000 * 1000;
+        let mem;
+
+        while(true){
+            mem = 4 * (iCmini * oH * oW + oC * iCmini * kH * kW );
+            if(mem < cache_mem || iCmini == 4 || iCmini % 2 != 0){
+                break;
+            }
+            iCmini /= 2;
         }
-        else{
 
-            oCmini = oC;
-        }
-
-        var shader_src = ConvTranspose2dShader
-            .replace(/numInChannel/g, `${iC}`)
+        this.gpuShape = `COI:[${oC} x ${iC}(${iCmini})] HW:[${oH} x ${oW}] kHW:[${kH} x ${kW}] mem:${(mem/(1000*1000)).toFixed(1)}`;
+        
+        let shader_src = ConvTranspose2dShader
+            .replace(/numInChannel/g, `${iCmini}`)
             .replace(/numInRows/g,    `${iH}`)
             .replace(/numInCols/g,    `${iW}`)
             .replace(/numOutRows/g,   `${oH}`)
@@ -748,41 +743,43 @@ class ConvTranspose2d extends Module {
             .replace(/kernelH/g,      `${kH}`)
             .replace(/kernelW/g,      `${kW}`);
 
-        var y = new Tensor([N, oC, oH, oW])
+        let y = new Tensor([N, oC, oH, oW])
 
-        let y2      = new Float32Array(oCmini * oH * oW);
-        let weight2 = new Float32Array(oCmini * iC * kH * kW);
-        let zero    = new Float32Array(y2.length);
+        let zero    = (new Float32Array(y.data.length)).map(a => 0);
+
+        let pkg = {
+            id : `${this.name}`,
+            vertexShader: shader_src,
+            args : {
+                "in_channel_base": 0,
+                "zero"  : zero,
+                "x"     : gpgpu.makeTextureInfo("float", [iC, iH, iW], x.data),
+                "weight": gpgpu.makeTextureInfo("float", [oC, iC, kH * kW], weight.data),
+                "y"     : y.data
+            }
+        } as any as Package;
+
+        gpgpu.makePackage(pkg);
 
         this.gpuTime = 0;
-        let pkg = undefined;
-        for(let idx = 0; idx * oCmini < oC; idx++){
-            weight2 = weight.data.slice(idx * oCmini * iC * kH * kW, (idx + 1) * oCmini * iC * kH * kW)
 
-            pkg = {
-                id : `${this.name}`,
-                vertexShader: shader_src,
-                args : {
-                    "zero"  : zero,
-                    "x"     : gpgpu.makeTextureInfo("float", [iC, iH, iW], x.data),
-                    "weight": gpgpu.makeTextureInfo("float", [oCmini, iC, kH * kW], weight2),
-                    "y"     : y2
+        for(let idx = 0; idx * iCmini < iC; idx++){
+            if(idx != 0){
+                for(let i = 0; i < zero.length; i++){
+                    zero[i] = y.data[i];
                 }
-            } as any as Package;
+            }
+
+            pkg.args["in_channel_base"] = idx * iCmini;
+
 
             let startTime = Date.now(); 
             gpgpu.compute(pkg);
             this.gpuTime += Date.now() - startTime;
 
-            gpgpu.clear(pkg);
-
-            let base = idx * oCmini * oH * oW;
-            for(let i = 0; i < y2.length; i++){
-                y.data[base + i] = y2[i];
-            }
-
             yield;
         }
+        gpgpu.clear(pkg);
 
         yield y;
     }
@@ -808,8 +805,6 @@ class Conv2d extends Module {
         this.padding = obj['padding'];
         this.stride = obj['stride'];
         this.groups = obj['groups'];
-
-        // log(`${this.name} ${this.type} ${this.weight.shape_last()} ${this.padding} ${this.stride} ${this.groups}`)
     }
 
     *forward(pack: [Tensor, Tensor]) {
@@ -831,9 +826,6 @@ class Conv2d extends Module {
         yield;
 
         let mod_rates = bias_y.add(1);// (N, iC)
-
-        // let mod_rates = this.bias.forward();// + 1 // (N, iC)
-        // mod_rates.data = mod_rates.data.map(a => a + 1);
 
         if(1000 < startTime - Date.now()){log(`  A ${this.type} ${(Date.now() - startTime) / 1000}秒`);} startTime = Date.now();
 
@@ -865,7 +857,6 @@ class Conv2d extends Module {
     /*
         GPUによる順伝播
     */
-
     *gpuConv2d(x: Tensor, weight: Tensor) {
         let [N, iC, H, W] = x.shape
         let [N2, oC, iC2, kH, kW] = weight.shape;
@@ -877,7 +868,7 @@ class Conv2d extends Module {
         let iCmini = iC;
 
         let cache_mem = 5 * 1000 * 1000;
-        let mem;// = 4 * (iCmini * H * W + oC * iCmini * kH * kW );
+        let mem;
 
         while(true){
             mem = 4 * (iCmini * H * W + oC * iCmini * kH * kW );
@@ -905,12 +896,6 @@ class Conv2d extends Module {
             shiftRowsCols = Math.log2(H * W);
             shiftCols = Math.log2(W);
             console.assert(Math.round(shiftRowsCols) == shiftRowsCols && Math.round(shiftCols) == shiftCols);
-
-/*
-            conv_shader = ConvolutionalLayerOLD;
-            weight2_shape = [oCmini, iC, kH * kW];
-            weight2_texelType   = "float";
-*/
         }
         else{
 
@@ -928,13 +913,9 @@ class Conv2d extends Module {
             .replace(/kernelH/g,      `${kH}`)
             .replace(/kernelW/g,      `${kW}`);
 
-
         let y  = new Tensor([N, oC, H, W]);
 
-        let zero    = new Float32Array(y.data.length);
-        for(let i = 0; i < zero.length; i++){
-            zero[i] = 0;
-        }
+        let zero    = (new Float32Array(y.data.length)).map(a => 0);
 
         let pkg = {
             id : `${this.name}`,
@@ -949,7 +930,6 @@ class Conv2d extends Module {
         } as any as Package;
 
         gpgpu.makePackage(pkg);
-        let in_channel_base = pkg.uniforms.find(a => a.name == "in_channel_base");
 
         this.gpuTime = 0;
         for(let idx = 0; idx * iCmini < iC; idx++){
@@ -960,18 +940,11 @@ class Conv2d extends Module {
             }
 
             pkg.args["in_channel_base"] = idx * iCmini;
-            // in_channel_base.value = idx * iCmini;
-            // console.log(`in_channel_base.value: idx:${idx} val:${in_channel_base.value} mini:${iCmini} iC:${iC}`);
-            // gl.uniform1i(in_channel_base.locUniform, idx * iCmini); chk();
-            if(idx != 0){
-                // log("");
-            }
 
             let startTime = Date.now(); 
             gpgpu.compute(pkg);
             this.gpuTime += Date.now() - startTime;
         
-
             yield;
         }
 
@@ -1331,6 +1304,7 @@ precision highp sampler3D;
 
 uniform sampler3D weight;
 uniform sampler3D x;
+uniform int in_channel_base;
 
 in  float zero;
 out float y;
@@ -1348,10 +1322,9 @@ void main() {
     int c1 = idx - r1 * numOutCols;
 
     float sum = 0.0f;
-    int  in_channel_idx;
-
-    for(in_channel_idx = 0; in_channel_idx < numInChannel; in_channel_idx++) {
-
+    for(int in_channel_offset = 0; in_channel_offset < numInChannel; in_channel_offset++) {
+        int in_channel_idx = in_channel_base + in_channel_offset;
+    
         for (int r2 = 0; r2 < kernelH; r2++) {
 
             for (int c2 = 0; c2 < kernelW; c2++) {
