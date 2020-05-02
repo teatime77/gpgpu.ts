@@ -5,7 +5,7 @@ declare let mat3:any;
 
 type TextureValue = Float32Array | HTMLImageElement | HTMLCanvasElement;
 
-let gl : WebGL2RenderingContext;
+export let gl : WebGL2RenderingContext;
 
 /*
     エラーのチェックをします。
@@ -23,8 +23,15 @@ export function range(n: number) : number[]{
 /*
     WebGLのエラーのチェックをします。
 */
-function chk() {
-    assert(gl.getError() == gl.NO_ERROR);
+export function chk() {
+    function chk() {
+        let sts = gl.getError();
+        if(sts != gl.NO_ERROR){
+    
+            console.log(`chk:${sts.toString(16)}`);
+            console.assert(false);
+        }
+    }
 }
 
 
@@ -218,7 +225,7 @@ export class Package{
     id: string;
     vertexShader: string;
     fragmentShader: string;
-    args: Map<string, Float32Array|TextureInfo>|Mesh;
+    args: { [name: string]: Float32Array|TextureInfo } | Mesh;
     VertexIndexBuffer: Uint16Array | Uint32Array;
     program: WebGLProgram;
     transformFeedback: WebGLTransformFeedback;
@@ -263,7 +270,7 @@ export class TextureInfo {
 
 class ArgInf {
     name: string;
-    value: Float32Array;
+    value: Float32Array | number;
     type: string;
     isArray: boolean;
     feedbackBuffer: WebGLBuffer;
@@ -839,7 +846,7 @@ export class GPGPU {
             var attrib_dim = this.vecDim(attrib.type);
 
             // 要素の個数
-            var elemen_count = attrib.value.length / attrib_dim;
+            var elemen_count = (attrib.value as Float32Array).length / attrib_dim;
 
             if(pkg.attribElementCount == undefined){
 
@@ -1091,7 +1098,7 @@ export class GPGPU {
             gl.vertexAttribPointer(attrib.AttribLoc, dim, gl.FLOAT, false, 0, 0); chk();
 
             // attribute変数のデータをセットする。
-            gl.bufferData(gl.ARRAY_BUFFER, attrib.value, gl.STATIC_DRAW);
+            gl.bufferData(gl.ARRAY_BUFFER, attrib.value as Float32Array, gl.STATIC_DRAW);
         }
     }
 
@@ -1259,7 +1266,7 @@ export class GPGPU {
                 gl.bindBuffer(gl.ARRAY_BUFFER, varying.feedbackBuffer); chk();
 
                 // ARRAY_BUFFERのデータを取り出す。
-                gl.getBufferSubData(gl.ARRAY_BUFFER, 0, varying.value); chk();
+                gl.getBufferSubData(gl.ARRAY_BUFFER, 0, varying.value as Float32Array); chk();
 
                 // ARRAY_BUFFERのバインドを解く。
                 gl.bindBuffer(gl.ARRAY_BUFFER, null); chk();
@@ -1422,6 +1429,6 @@ export class GPGPU {
 
     この関数の内部に関数やクラスを入れて外部から参照されないようにします。
 */
-export function CreateGPGPU(canvas: HTMLCanvasElement, ui3d: UI3D=new UI3D()) {
+export function CreateGPGPU(canvas: HTMLCanvasElement = undefined, ui3d: UI3D=new UI3D()) {
     return new GPGPU(canvas, ui3d);
 }

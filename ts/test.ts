@@ -38,7 +38,7 @@ class TextDrawable extends Drawable {
                 id: "label",
                 vertexShader: GPGPU.textureSphereVertexShader,
                 fragmentShader: GPGPU.defaultFragmentShader,
-                args: mesh as any as Map<string, Float32Array|TextureInfo>,
+                args: mesh,
                 VertexIndexBuffer: idx_array
             } as Package ;
         }
