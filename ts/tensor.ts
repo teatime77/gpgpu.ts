@@ -286,7 +286,7 @@ class Module {
         this.type = obj['type'];
         this.obj  = obj;
 
-        console.assert(this.constructor.name == 'Conv2d' || this.constructor.name == obj['type']);
+        console.assert(this.constructor.name == 'Conv2d' || this.constructor.name == 'ConvTranspose2d' || this.constructor.name == obj['type']);
 
         if(! (this instanceof ModuleListSequential) && !(this instanceof ImageGenerator)){
 
@@ -353,82 +353,6 @@ class Module {
         gpgpu.clear(pkg);
 
         return y;
-    }
-   
-
-    /*
-        GPUによる順伝播
-    */
-    *gpuConvTranspose2d(x: Tensor, weight: Tensor, stride: number, padding: number){
-        let [N, iC, iH, iW] = x.shape
-        let [oC, iC2, kH, kW] = weight.shape;
-
-        console.assert(stride == 2 && padding == 0);
-
-        let oH = (iH - 1) * stride + (kH - 1) + 1;
-        let oW = (iW - 1) * stride + (kW - 1) + 1;
-
-        this.nCalc = (oC * oH * oW) * (iC * kH * kW);
-        this.gpuShape = `[${oC} ${oH} ${oW} x ${iC} ${kH} ${kW}]`;
-
-        let oCmini;
-        if(10 * 10000 * 10000 < this.nCalc){
-
-
-            console.assert(oC % 8 == 0);
-            oCmini = oC / 8;
-        }
-        else{
-
-            oCmini = oC;
-        }
-
-        var shader_src = ConvTranspose2d
-            .replace(/numInChannel/g, `${iC}u`)
-            .replace(/numInRows/g,    `${iH}u`)
-            .replace(/numInCols/g,    `${iW}u`)
-            .replace(/numOutRows/g,   `${oH}u`)
-            .replace(/numOutCols/g,   `${oW}u`)
-            .replace(/kernelH/g,      `${kH}u`)
-            .replace(/kernelW/g,      `${kW}u`);
-
-        var y = new Tensor([N, oC, oH, oW])
-
-        let y2      = new Float32Array(oCmini * oH * oW);
-        let weight2 = new Float32Array(oCmini * iC * kH * kW);
-        let zero    = new Float32Array(y2.length);
-
-        this.gpuTime = 0;
-        let pkg = undefined;
-        for(let idx = 0; idx * oCmini < oC; idx++){
-            weight2 = weight.data.slice(idx * oCmini * iC * kH * kW, (idx + 1) * oCmini * iC * kH * kW)
-
-            pkg = {
-                id : `${this.name}`,
-                vertexShader: shader_src,
-                args : {
-                    "zero"  : zero,
-                    "x"     : gpgpu.makeTextureInfo("float", [iC, iH, iW], x.data),
-                    "weight": gpgpu.makeTextureInfo("float", [oCmini, iC, kH * kW], weight2),
-                    "y"     : y2
-                }
-            } as any as Package;
-
-            let startTime = Date.now(); 
-            gpgpu.compute(pkg);
-            this.gpuTime += Date.now() - startTime;
-
-            gpgpu.clear(pkg);
-
-            let base = idx * oCmini * oH * oW;
-            for(let i = 0; i < y2.length; i++){
-                y.data[base + i] = y2[i];
-            }
-
-            yield;
-        }
-
-        yield y;
     }
 
     shortType() : string {
@@ -717,7 +641,7 @@ class FusedBlur3x3 extends Module {
     }
 }
 
-class EqualizedModulatedConvTranspose2d extends Module {
+class ConvTranspose2d extends Module {
     fc: EqualizedFullyConnect;
     bias: AddChannelwiseBias;
     weight: Tensor;
@@ -787,6 +711,82 @@ class EqualizedModulatedConvTranspose2d extends Module {
         // log(`    y:${this.diff(y)}`);
         yield y;
     }
+
+
+    /*
+        GPUによる順伝播
+    */
+   *gpuConvTranspose2d(x: Tensor, weight: Tensor, stride: number, padding: number){
+        let [N, iC, iH, iW] = x.shape
+        let [oC, iC2, kH, kW] = weight.shape;
+
+        console.assert(stride == 2 && padding == 0);
+
+        let oH = (iH - 1) * stride + (kH - 1) + 1;
+        let oW = (iW - 1) * stride + (kW - 1) + 1;
+
+        this.nCalc = (oC * oH * oW) * (iC * kH * kW);
+        this.gpuShape = `[${oC} ${oH} ${oW} x ${iC} ${kH} ${kW}]`;
+
+        let oCmini;
+        if(10 * 10000 * 10000 < this.nCalc){
+
+            console.assert(oC % 8 == 0);
+            oCmini = oC / 8;
+        }
+        else{
+
+            oCmini = oC;
+        }
+
+        var shader_src = ConvTranspose2dShader
+            .replace(/numInChannel/g, `${iC}`)
+            .replace(/numInRows/g,    `${iH}`)
+            .replace(/numInCols/g,    `${iW}`)
+            .replace(/numOutRows/g,   `${oH}`)
+            .replace(/numOutCols/g,   `${oW}`)
+            .replace(/kernelH/g,      `${kH}`)
+            .replace(/kernelW/g,      `${kW}`);
+
+        var y = new Tensor([N, oC, oH, oW])
+
+        let y2      = new Float32Array(oCmini * oH * oW);
+        let weight2 = new Float32Array(oCmini * iC * kH * kW);
+        let zero    = new Float32Array(y2.length);
+
+        this.gpuTime = 0;
+        let pkg = undefined;
+        for(let idx = 0; idx * oCmini < oC; idx++){
+            weight2 = weight.data.slice(idx * oCmini * iC * kH * kW, (idx + 1) * oCmini * iC * kH * kW)
+
+            pkg = {
+                id : `${this.name}`,
+                vertexShader: shader_src,
+                args : {
+                    "zero"  : zero,
+                    "x"     : gpgpu.makeTextureInfo("float", [iC, iH, iW], x.data),
+                    "weight": gpgpu.makeTextureInfo("float", [oCmini, iC, kH * kW], weight2),
+                    "y"     : y2
+                }
+            } as any as Package;
+
+            let startTime = Date.now(); 
+            gpgpu.compute(pkg);
+            this.gpuTime += Date.now() - startTime;
+
+            gpgpu.clear(pkg);
+
+            let base = idx * oCmini * oH * oW;
+            for(let i = 0; i < y2.length; i++){
+                y.data[base + i] = y2[i];
+            }
+
+            yield;
+        }
+
+        yield y;
+    }
+
 }
 
 class Conv2d extends Module {
@@ -1058,7 +1058,7 @@ class ModuleListSequential extends Module {
             }
 
             let sec = (Date.now() - startTime) / 1000;
-            if(m instanceof Conv2d && 37000000 < m.nCalc){
+            if(m instanceof ConvTranspose2d && 37000000 < m.nCalc){
 
                 let py_time = (m.obj['time'] == undefined ? "" :  m.obj['time'].toFixed(3));
                 let gpu_shape = (m.gpuShape == undefined ? "" : m.gpuShape);
@@ -1326,7 +1326,7 @@ void main() {
 }`;
 
 
-let ConvTranspose2d = `
+let ConvTranspose2dShader = `
 precision highp sampler3D;
 
 uniform sampler3D weight;
@@ -1336,40 +1336,38 @@ in  float zero;
 out float y;
 
 void main() {
-    uint idx = uint(gl_VertexID);
+    int idx = int(gl_VertexID);
 
-    uint num_in_rows_ex = 2u * numInRows - 1u;
-    uint num_in_cols_ex = 2u * numInCols - 1u;
+    int num_in_rows_ex = 2 * numInRows - 1;
+    int num_in_cols_ex = 2 * numInCols - 1;
 
-    uint out_channel_idx = idx / (numOutRows * numOutCols);
+    int out_channel_idx = idx / (numOutRows * numOutCols);
     idx -= out_channel_idx * (numOutRows * numOutCols);
 
-    uint r1 = idx / numOutCols;
-    uint c1 = idx - r1 * numOutCols;
+    int r1 = idx / numOutCols;
+    int c1 = idx - r1 * numOutCols;
 
     float sum = 0.0f;
-    uint  in_channel_idx;
+    int  in_channel_idx;
 
-    for(in_channel_idx = 0u; in_channel_idx < numInChannel; in_channel_idx++) {
+    for(in_channel_idx = 0; in_channel_idx < numInChannel; in_channel_idx++) {
 
-        uint r2, c2;
+        for (int r2 = 0; r2 < kernelH; r2++) {
 
-        for (r2 = 0u; r2 < kernelH; r2++) {
+            for (int c2 = 0; c2 < kernelW; c2++) {
 
-            for (c2 = 0u; c2 < kernelW; c2++) {
+                int c3 = c1 + c2 - (kernelW - 1);
+                int r3 = r1 + r2 - (kernelH - 1);
 
-                uint c3 = c1 + c2 - (kernelW - 1u);
-                uint r3 = r1 + r2 - (kernelH - 1u);
-
-                if(0u <= c3 && c3 < num_in_cols_ex && 0u <= r3 && r3 < num_in_rows_ex && c3 % 2u == 0u && r3 % 2u == 0u){
-                    c3 /= 2u;
-                    r3 /= 2u;
+                if(0 <= c3 && c3 < num_in_cols_ex && 0 <= r3 && r3 < num_in_rows_ex && c3 % 2 == 0 && r3 % 2 == 0){
+                    c3 /= 2;
+                    r3 /= 2;
 
                     vec4 txl = texelFetch(x    , ivec3(c3, r3, in_channel_idx), 0);
 
-                    vec4  w = texelFetch(weight, ivec3((kernelH - 1u - r2) * kernelW + (kernelW - 1u - c2), in_channel_idx, out_channel_idx), 0);
+                    vec4  w = texelFetch(weight, ivec3((kernelH - 1 - r2) * kernelW + (kernelW - 1 - c2), in_channel_idx, out_channel_idx), 0);
                     // vec4  w = texelFetch(weight, ivec3(r2 * kernelW + c2, out_channel_idx, in_channel_idx), 0);
-                    // vec4  w = texelFetch(weight, ivec3( (kernelW - 1u - c2) * kernelH + (kernelH - 1u - r2), out_channel_idx, in_channel_idx), 0);
+                    // vec4  w = texelFetch(weight, ivec3( (kernelW - 1 - c2) * kernelH + (kernelH - 1 - r2), out_channel_idx, in_channel_idx), 0);
 
                     sum += txl.r * w.r;
                 }
@@ -1414,7 +1412,7 @@ function parseModel(obj:any) : Module{
         return new FusedBlur3x3(obj);
 
     case 'EqualizedModulatedConvTranspose2d':
-        return new EqualizedModulatedConvTranspose2d(obj);
+        return new ConvTranspose2d(obj);
 
     case 'EqualizedModulatedConv2d':
         return new Conv2d(obj);
