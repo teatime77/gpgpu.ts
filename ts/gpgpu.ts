@@ -229,6 +229,11 @@ export class Package{
     VertexIndexBuffer: Uint16Array | Uint32Array;
     program: WebGLProgram;
     transformFeedback: WebGLTransformFeedback;
+
+    frameBuffer: WebGLFramebuffer;
+    frameBufferTexture: WebGLTexture;
+    renderBuffer : WebGLRenderbuffer;
+
     vertexIndexBufferInf: WebGLBuffer;
     textures: TextureInfo[];
     attribElementCount: number;
@@ -519,6 +524,12 @@ export class GPGPU {
         }
         `;
 
+    static readonly vertexPositionShader = `
+        in vec3 aVertexPosition;
+                
+        void main(void) {
+            gl_Position = vec4(aVertexPosition, 1.0);
+        }`;
 
     canvas: HTMLCanvasElement;
     TEXTUREs: number[];
@@ -564,6 +575,12 @@ export class GPGPU {
             throw "WebGL 2 is not available.";
         }
 
+        const ext = gl.getExtension("EXT_color_buffer_float");
+        if (!ext) {
+            alert("need EXT_color_buffer_float");
+            return;
+        }
+
         // 標準のシェーダの文字列をセットする。
         this.setStandardShaderString();
 
@@ -603,6 +620,10 @@ export class GPGPU {
 
         gl.bindBuffer(gl.ARRAY_BUFFER, null); chk();
 
+        // テクスチャのバインドを解く。
+        gl.bindTexture(gl.TEXTURE_2D, null); chk();
+        gl.bindTexture(gl.TEXTURE_3D, null); chk();
+
         if (pkg.vertexIndexBufferInf) {
 
             // バッファを削除する。
@@ -625,9 +646,15 @@ export class GPGPU {
             gl.deleteTransformFeedback(pkg.transformFeedback); chk();
         }
 
-        // テクスチャのバインドを解く。
-        gl.bindTexture(gl.TEXTURE_2D, null); chk();
-        gl.bindTexture(gl.TEXTURE_3D, null); chk();
+        if(pkg.frameBuffer){
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null); chk();
+            gl.bindRenderbuffer(gl.RENDERBUFFER, null); chk();
+
+            gl.deleteFramebuffer(pkg.frameBuffer); chk();
+            gl.deleteTexture(pkg.frameBufferTexture); chk();
+            gl.deleteRenderbuffer(pkg.renderBuffer); chk();
+        }
 
         // すべてのテクスチャを削除する。
         pkg.textures.forEach(x => gl.deleteTexture(x.Texture), chk())
@@ -648,6 +675,9 @@ export class GPGPU {
 
         // 頂点シェーダとフラグメントシェーダのソースに対し
         for(let shader_text of[ pkg.vertexShader,  pkg.fragmentShader ]) {
+            if(shader_text == GPGPU.vertexPositionShader){
+                continue;
+            }
 
             // 行ごとに分割する。
             var lines = shader_text.split(/(\r\n|\r|\n)+/);

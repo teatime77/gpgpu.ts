@@ -10,8 +10,8 @@ let vertices = [
     // Front face
     -sz, -sz,  -0.0,
      sz, -sz,  -0.0,
-     sz,  sz,  -0.0,
     -sz,  sz,  -0.0,
+     sz,  sz,  -0.0,
 ];
 
 function setRandom(v: Float32Array){
@@ -37,12 +37,12 @@ function gpuConv2d(x: Tensor, weight: Tensor){
     uniform sampler3D weight;
     uniform sampler3D x;
     
-    in vec4 vPosition;
     out vec4 color;
     
     void main() {
-        int ix = int(round(${buf_w}.0 * (1.0 + vPosition.x - ${1.0 / buf_w}) / 2.0));
-        int iy = int(round(${buf_h}.0 * (1.0 + vPosition.y - ${1.0 / buf_h}) / 2.0));
+        int iy = int(floor(gl_FragCoord.y));
+        int ix = int(floor(gl_FragCoord.x));
+
     
         int out_channel_idx = iy / ${H};        
         int r1 = iy - out_channel_idx * ${H};
@@ -87,16 +87,58 @@ function gpuConv2d(x: Tensor, weight: Tensor){
     pkg.id = `new-conv2d`;
     pkg.buf_h = buf_h;
     pkg.buf_w = buf_w;
-    pkg.vertexShader = vertex_shader;
+    pkg.vertexShader = GPGPU.vertexPositionShader;
     pkg.fragmentShader = shader_src;
     pkg.args = {
         "x"     : new TextureInfo("float", [iC, H, W], x.data),
         "weight": new TextureInfo("vec3", [oC, iC, kH], weight.data),
-        "aVertexPosition": new Float32Array(vertices)
     };
 
     return pkg;
 }
+
+function drawSceneOnLaptopScreen(pkg: Package2) {
+    let [buf_h, buf_w] = [pkg.buf_h, pkg.buf_w];
+
+
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    let dt;
+    let format;
+    let type;
+
+    if(floatFB){
+
+        dt = new Float32Array(4 * buf_w * buf_h);
+        if(Red){
+
+            format = gl.RED;
+        }
+        else{
+
+            format = gl.RGBA;
+        }
+        type = gl.FLOAT;
+    }
+    else{
+
+        dt = new Uint8Array(buf_w * buf_h * 4);
+        format = gl.RGBA;
+        type = gl.UNSIGNED_BYTE;
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    let start = Date.now();
+    gl.readPixels(0, 0, buf_w, buf_h, format, type, dt); chk();
+    log(`time :${Date.now() - start}`)    
+    
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+
+    return dt;
+}
+
 
 function checkConv2(pkg: Package2, x: Tensor, weight: Tensor, dt: Float32Array){
     let [buf_h, buf_w] = [pkg.buf_h, pkg.buf_w];
@@ -143,7 +185,7 @@ function checkConv2(pkg: Package2, x: Tensor, weight: Tensor, dt: Float32Array){
             }
 
             let d = sum - sum2;
-            if(0.0001 < Math.abs(d)){
+            if(0.0002 < Math.abs(d)){
 
                 log(`NG ${out_channel_idx} ${r1} ${c1} c:${sum} ${sum2}`)
             }
@@ -151,42 +193,9 @@ function checkConv2(pkg: Package2, x: Tensor, weight: Tensor, dt: Float32Array){
         }
     }
 
-    log(`cnt:${test_cnt}/${buf_h * buf_w}  diff: ${diff}`);
+    log(`cnt:${test_cnt}/${buf_h * buf_w}  diff: ${diff.toFixed(7)}`);
 }
 
-
-let vertex_shader = `
-in vec3 aVertexPosition;
-
-out vec2 vTextureCoord;
-out vec3 vTransformedNormal;
-out vec4 vPosition;
-
-void main(void) {
-    vPosition   = vec4(aVertexPosition, 1.0);
-    gl_Position = vec4(aVertexPosition, 1.0);
-}`;
-
-function initGL() {
-    let canvas = document.getElementById("webgl2-canvas") as HTMLCanvasElement;
-
-    try {
-        // gl = canvas.getContext("webgl2") as WebGL2RenderingContext;
-        const ext = gl.getExtension("EXT_color_buffer_float");
-        if (!ext) {
-            alert("need EXT_color_buffer_float");
-            return;
-        }
-
-    } catch (e) {
-    }
-    if (!gl) {
-        alert("Could not initialise WebGL, sorry :-(");
-    }
-}
-
-let renderbuffer;
-let rttFramebuffer;
 let floatFB = true;
 const Red = false;
 
@@ -195,9 +204,6 @@ function log(s){
 }
 
 let cubeVertexPositionBuffer;
-let cubeVertexIndexBuffer;
-
-
 
 class Package2 extends Package {
     buf_w = 1000;// 1024;
@@ -207,23 +213,19 @@ class Package2 extends Package {
 }
 
 function makeMulPackage() : [Package2, Float32Array, Float32Array] {
-    let buf_h = 2000;
-    let buf_w = 2000;
+    let buf_h = 1000;
+    let buf_w = 1000;
 
 
     let fragment_shader = `
-    in vec4 vPosition;
     out vec4 color;
     
     uniform sampler2D A;
     uniform sampler2D B;
     
     void main(void) {
-        float x = ${buf_w}.0 * (1.0 + vPosition.x - ${1.0 / buf_w}) / 2.0;
-        float y = ${buf_h}.0 * (1.0 + vPosition.y - ${1.0 / buf_h}) / 2.0;
-    
-        int row = int(round(y));
-        int col = int(round(x));
+        int row = int(floor(gl_FragCoord.y));
+        int col = int(floor(gl_FragCoord.x));
     
         float sum = 0.0f;
         for(int i = 0; i < ${buf_w}; i++) {
@@ -238,9 +240,6 @@ function makeMulPackage() : [Package2, Float32Array, Float32Array] {
             sum += a.r * b.r;
         }
     
-        // float w = texelFetch(A, ivec2(0, 2), 0).r * texelFetch(B, ivec2(2, 0), 0).r
-        //         + texelFetch(A, ivec2(1, 2), 0).r * texelFetch(B, ivec2(2, 1), 0).r
-        //         + texelFetch(A, ivec2(2, 2), 0).r * texelFetch(B, ivec2(2, 2), 0).r;
         float w = texelFetch(A, ivec2(col, row), 0).r;
     
         color = vec4(float(col), float(row), sum, w);
@@ -256,12 +255,11 @@ function makeMulPackage() : [Package2, Float32Array, Float32Array] {
     pkg.id            = "test";
     pkg.buf_h = buf_h;
     pkg.buf_w = buf_w;
-    pkg.vertexShader = vertex_shader;
+    pkg.vertexShader = GPGPU.vertexPositionShader;
     pkg.fragmentShader = fragment_shader;
     pkg.args = {
         "A": new TextureInfo("float", [buf_h, buf_w], A),
         "B": new TextureInfo("float", [buf_h, buf_w], B),
-        "aVertexPosition": new Float32Array(vertices)
     };
 
     return [pkg, A, B];
@@ -276,9 +274,10 @@ function checkIdx(pkg: Package2, dt: Float32Array){
             let i = 4 * (iy * buf_w + ix);
             let x = dt[i];
             let y = dt[i + 1];
+            let z = dt[i + 3];
             if(ix != x || iy != y){
 
-                log(`NG IDX x:${ix - x} y:${iy - y}`)
+                log(`NG IDX x: ${ix} ${x} ${z} y:${iy} ${y}`)
             }
         }
     }
@@ -290,17 +289,6 @@ function runMul(pkg: Package2, A: Float32Array, B: Float32Array){
     let [buf_h, buf_w] = [pkg.buf_h, pkg.buf_w];
 
     let dt = new Float32Array(4 * buf_w * buf_h);
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, rttFramebuffer); chk();
-
-    gl.viewport(0, 0, buf_w, buf_h); chk();
-    gl.clear(gl.COLOR_BUFFER_BIT); chk();
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexPositionBuffer); chk();
-    gl.vertexAttribPointer(pkg.vertexAttrLoc, cubeVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0); chk();
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVertexIndexBuffer); chk();
-
 
     let time = 0;
     let C = new Float32Array(buf_h * buf_w);
@@ -333,7 +321,7 @@ function runMul(pkg: Package2, A: Float32Array, B: Float32Array){
 
         let start = Date.now();
         gpgpu.setTextureData(pkg);
-        gl.drawElements(gl.TRIANGLES, cubeVertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0); chk();
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
         gl.readPixels(0, 0, buf_w, buf_h, gl.RGBA, gl.FLOAT, dt); chk();
         time += Date.now() - start;
@@ -382,17 +370,18 @@ function checkMul(pkg: Package2, C2: Float32Array, dt: Float32Array){
                 let c2 = C2[iy * buf_w + ix];
 
                 diff = Math.max(diff, Math.abs(c - c2));
-                if(0.0001 < Math.abs(c - c2)){
+                if(0.0002 < Math.abs(c - c2)){
 
                     log(`NG c:${c - c2}`)
                 }
             }
         }
     }
-    log(`diff ${diff}`);
+    log(`diff ${diff.toFixed(7)}`);
 }
 
 class GPGPU2 extends GPGPU {
+
     constructor(canvas: HTMLCanvasElement, ui3d: UI3D = undefined){
         super(canvas, ui3d);
     }
@@ -401,29 +390,20 @@ class GPGPU2 extends GPGPU {
         cubeVertexPositionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexPositionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-        cubeVertexPositionBuffer.itemSize = 3;
-        cubeVertexPositionBuffer.numItems = 4;
-    
-        cubeVertexIndexBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVertexIndexBuffer);
-        let cubeVertexIndices = [0, 1, 2, 0, 2, 3];
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(cubeVertexIndices), gl.STATIC_DRAW);
-        cubeVertexIndexBuffer.itemSize = 1;
-        cubeVertexIndexBuffer.numItems = 6;
     }
 
     makeFramebuffer(pkg: Package2) {
         let [buf_h, buf_w] = [pkg.buf_h, pkg.buf_w];
 
-        rttFramebuffer = gl.createFramebuffer(); chk();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, rttFramebuffer); chk();
+        pkg.frameBuffer = gl.createFramebuffer(); chk();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, pkg.frameBuffer); chk();
     
-        let tex = gl.createTexture(); chk();
+        pkg.frameBufferTexture = gl.createTexture(); chk();
     
         // 指定した位置のテクスチャをアクティブにする。
         gl.activeTexture(gpgpu.TEXTUREs[ pkg.textures.length ]); chk();
     
-        gl.bindTexture(gl.TEXTURE_2D, tex); chk();
+        gl.bindTexture(gl.TEXTURE_2D, pkg.frameBufferTexture); chk();
     
         if(floatFB){
     
@@ -439,66 +419,15 @@ class GPGPU2 extends GPGPU {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, buf_w, buf_h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);chk();
         }
     
-        renderbuffer = gl.createRenderbuffer(); chk();
-        gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer); chk();
+        pkg.renderBuffer = gl.createRenderbuffer(); chk();
+        gl.bindRenderbuffer(gl.RENDERBUFFER, pkg.renderBuffer); chk();
     
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0); chk();
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pkg.frameBufferTexture, 0); chk();
     
         gl.bindTexture(gl.TEXTURE_2D, null); chk();
         gl.bindRenderbuffer(gl.RENDERBUFFER, null); chk();
         gl.bindFramebuffer(gl.FRAMEBUFFER, null); chk();
     }    
-
-    drawSceneOnLaptopScreen(pkg: Package2) {
-        let [buf_h, buf_w] = [pkg.buf_h, pkg.buf_w];
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, rttFramebuffer); chk();
-    
-        gl.viewport(0, 0, buf_w, buf_h); chk();
-        gl.clear(gl.COLOR_BUFFER_BIT); chk();
-    
-        gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexPositionBuffer); chk();
-        gl.vertexAttribPointer(pkg.vertexAttrLoc, cubeVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0); chk();
-    
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeVertexIndexBuffer); chk();
-    
-        gl.drawElements(gl.TRIANGLES, cubeVertexIndexBuffer.numItems, gl.UNSIGNED_SHORT, 0); chk();
-    
-        let dt;
-        let format;
-        let type;
-    
-        if(floatFB){
-    
-            dt = new Float32Array(4 * buf_w * buf_h);
-            if(Red){
-    
-                format = gl.RED;
-            }
-            else{
-    
-                format = gl.RGBA;
-            }
-            type = gl.FLOAT;
-        }
-        else{
-    
-            dt = new Uint8Array(buf_w * buf_h * 4);
-            format = gl.RGBA;
-            type = gl.UNSIGNED_BYTE;
-        }
-    
-        gl.bindTexture(gl.TEXTURE_2D, null);
-    
-        let start = Date.now();
-        gl.readPixels(0, 0, buf_w, buf_h, format, type, dt); chk();
-        log(`time :${Date.now() - start}`)    
-        
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-
-        return dt;
-    }
 
     prepare(pkg: Package2){
         this.initBuffers();
@@ -512,16 +441,22 @@ class GPGPU2 extends GPGPU {
         gl.enableVertexAttribArray(pkg.vertexAttrLoc); chk();
 
         this.makeFramebuffer(pkg);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, pkg.frameBuffer); chk();
+
+        gl.viewport(0, 0, pkg.buf_w, pkg.buf_h); chk();
+        gl.clear(gl.COLOR_BUFFER_BIT); chk();
+    
+        gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexPositionBuffer); chk();
+        gl.vertexAttribPointer(pkg.vertexAttrLoc, 3, gl.FLOAT, false, 0, 0); chk();
     }
 }
 
 export function gpuBodyOnLoad(){
     let canvas = document.getElementById("webgl2-canvas") as HTMLCanvasElement;
     gpgpu = new GPGPU2(canvas);
-
-    initGL();
-
-    if(false){
+ 
+    {
         let [H, W] = [1024, 1024];
         let [oC, iC, kH, kW] = [ 16, 16, 3, 3 ];
 
@@ -533,17 +468,19 @@ export function gpuBodyOnLoad(){
         setRandom(weight.data);
         let pkg = gpuConv2d(x, weight);
         gpgpu.prepare(pkg);
-        let dt = this.drawSceneOnLaptopScreen(pkg);
+        let dt = drawSceneOnLaptopScreen(pkg);
         gpgpu.clear(pkg);
 
         checkIdx(pkg, dt);
         checkConv2(pkg, x, weight, dt);
     }
-    else{
 
+    {
+        log("\n--------------------------------------------------\n");
         let [pkg, A, B] = makeMulPackage();
         gpgpu.prepare(pkg);
         runMul(pkg, A, B);
         gpgpu.clear(pkg);
     }
+
 }
