@@ -1,6 +1,8 @@
 // import {CreateNeuralNetworkShaders} from "shader.js";
 import {GPGPU, Package, CreateGPGPU, gl, chk} from "./gpgpu.js";
 
+let i_latent = 0;
+
 function log(s: string){
     console.log(s)
 }
@@ -525,8 +527,6 @@ class EqualizedFullyConnect extends Module {
             C = sum + zero;
         }`;
 
-
-
         // 出力変数Cは配列のサイズ(2 * 2)を指定して作ります。
         let y = new Tensor([x.shape[0], this.weight.shape[0]], new Float32Array(x.shape[0] * this.weight.shape[0]));
 
@@ -648,7 +648,7 @@ class FusedBlur3x3 extends Module {
         let oH = iH + 2 * padding - (kH - 1) - 1 + 1;
         let oW = iW + 2 * padding - (kW - 1) - 1 + 1;
 
-        let Conv2dGroup = `
+        let shader_src = `
         precision highp sampler3D;
         
         uniform sampler3D weight;
@@ -660,30 +660,30 @@ class FusedBlur3x3 extends Module {
         void main() {
             int idx = int(gl_VertexID);
         
-            int channel_idx = idx / (numOutRows * numOutCols);
-            idx -= channel_idx * (numOutRows * numOutCols);
+            int channel_idx = idx / (${oH} * ${oW});
+            idx -= channel_idx * (${oH} * ${oW});
         
-            int r1 = idx / numOutCols;
-            int c1 = idx - r1 * numOutCols;
+            int r1 = idx / ${oW};
+            int c1 = idx - r1 * ${oW};
         
             float sum = 0.0f;
         
             int r2, c2;
         
-            for (r2 = 0; r2 < kernelH; r2++) {
+            for (r2 = 0; r2 < ${kH}; r2++) {
         
-                for (c2 = 0; c2 < kernelW; c2++) {
+                for (c2 = 0; c2 < ${kW}; c2++) {
         
-                    // int c3 = c1 + c2 - (kernelW - 1);
-                    // int r3 = r1 + r2 - (kernelH - 1);
+                    // int c3 = c1 + c2 - (${kW} - 1);
+                    // int r3 = r1 + r2 - (${kH} - 1);
                     int c3 = c1 + c2 - 1;
                     int r3 = r1 + r2 - 1;
         
-                    if(0 <= c3 && c3 < numInCols && 0 <= r3 && r3 < numInRows){
+                    if(0 <= c3 && c3 < ${iW} && 0 <= r3 && r3 < ${iH}){
         
                         vec4 txl = texelFetch(x    , ivec3(c3, r3, channel_idx), 0);
         
-                        vec4  w = texelFetch(weight, ivec3(kernelW - 1 - c2, kernelH - 1 - r2, channel_idx), 0);
+                        vec4  w = texelFetch(weight, ivec3(${kW} - 1 - c2, ${kH} - 1 - r2, channel_idx), 0);
                         // vec4  w = texelFetch(weight, ivec3(c2, r2, channel_idx), 0);
         
                         sum += txl.r * w.r;
@@ -693,14 +693,6 @@ class FusedBlur3x3 extends Module {
         
             y = sum + zero;
         }`;
-
-        var shader_src = Conv2dGroup
-            .replace(/numInRows/g, `${iH}`)
-            .replace(/numInCols/g, `${iW}`)
-            .replace(/numOutRows/g, `${oH}`)
-            .replace(/numOutCols/g, `${oW}`)
-            .replace(/kernelH/g, `${kH}`)
-            .replace(/kernelW/g, `${kW}`);
 
         var y = new Tensor([N, oC, oH, oW])
         let zero = new Float32Array(y.data.length);
@@ -824,7 +816,7 @@ class ConvTranspose2d extends Module {
         this.gpuShape = `COI:[${oC} x ${iC}(${iCmini})] HW:[${oH} x ${oW}] kHW:[${kH} x ${kW}] mem:${(mem/(1000*1000)).toFixed(1)}`;
         
 
-        let ConvTranspose2dShader = `
+        let shader_src = `
         precision highp sampler3D;
         
         uniform sampler3D weight;
@@ -837,25 +829,25 @@ class ConvTranspose2d extends Module {
         void main() {
             int idx = int(gl_VertexID);
         
-            int num_in_rows_ex = 2 * numInRows - 1;
-            int num_in_cols_ex = 2 * numInCols - 1;
+            int num_in_rows_ex = 2 * ${iH} - 1;
+            int num_in_cols_ex = 2 * ${iW} - 1;
         
-            int out_channel_idx = idx / (numOutRows * numOutCols);
-            idx -= out_channel_idx * (numOutRows * numOutCols);
+            int out_channel_idx = idx / (${oH} * ${oW});
+            idx -= out_channel_idx * (${oH} * ${oW});
         
-            int r1 = idx / numOutCols;
-            int c1 = idx - r1 * numOutCols;
+            int r1 = idx / ${oW};
+            int c1 = idx - r1 * ${oW};
         
             float sum = 0.0f;
-            for(int in_channel_offset = 0; in_channel_offset < numInChannel; in_channel_offset++) {
+            for(int in_channel_offset = 0; in_channel_offset < ${iCmini}; in_channel_offset++) {
                 int in_channel_idx = in_channel_base + in_channel_offset;
             
-                for (int r2 = 0; r2 < kernelH; r2++) {
+                for (int r2 = 0; r2 < ${kH}; r2++) {
         
-                    for (int c2 = 0; c2 < kernelW; c2++) {
+                    for (int c2 = 0; c2 < ${kW}; c2++) {
         
-                        int c3 = c1 + c2 - (kernelW - 1);
-                        int r3 = r1 + r2 - (kernelH - 1);
+                        int c3 = c1 + c2 - (${kW} - 1);
+                        int r3 = r1 + r2 - (${kH} - 1);
         
                         if(0 <= c3 && c3 < num_in_cols_ex && 0 <= r3 && r3 < num_in_rows_ex && c3 % 2 == 0 && r3 % 2 == 0){
                             c3 /= 2;
@@ -863,9 +855,9 @@ class ConvTranspose2d extends Module {
         
                             vec4 txl = texelFetch(x    , ivec3(c3, r3, in_channel_idx), 0);
         
-                            vec4  w = texelFetch(weight, ivec3((kernelH - 1 - r2) * kernelW + (kernelW - 1 - c2), in_channel_idx, out_channel_idx), 0);
-                            // vec4  w = texelFetch(weight, ivec3(r2 * kernelW + c2, out_channel_idx, in_channel_idx), 0);
-                            // vec4  w = texelFetch(weight, ivec3( (kernelW - 1 - c2) * kernelH + (kernelH - 1 - r2), out_channel_idx, in_channel_idx), 0);
+                            vec4  w = texelFetch(weight, ivec3((${kH} - 1 - r2) * ${kW} + (${kW} - 1 - c2), in_channel_idx, out_channel_idx), 0);
+                            // vec4  w = texelFetch(weight, ivec3(r2 * ${kW} + c2, out_channel_idx, in_channel_idx), 0);
+                            // vec4  w = texelFetch(weight, ivec3( (${kW} - 1 - c2) * ${kH} + (${kH} - 1 - r2), out_channel_idx, in_channel_idx), 0);
         
                             sum += txl.r * w.r;
                         }
@@ -875,15 +867,6 @@ class ConvTranspose2d extends Module {
         
             y = sum + zero;
         }`;
-
-        let shader_src = ConvTranspose2dShader
-            .replace(/numInChannel/g, `${iCmini}`)
-            .replace(/numInRows/g,    `${iH}`)
-            .replace(/numInCols/g,    `${iW}`)
-            .replace(/numOutRows/g,   `${oH}`)
-            .replace(/numOutCols/g,   `${oW}`)
-            .replace(/kernelH/g,      `${kH}`)
-            .replace(/kernelW/g,      `${kW}`);
 
         let y = new Tensor([N, oC, oH, oW])
 
@@ -1255,7 +1238,7 @@ class ModuleListSequential extends Module {
                     gpu_time = `${py_time}|${(m.gpuTime / 1000).toFixed(3)}秒 ${(m.nCalc / (10000*10000)).toFixed(3)}億回 ${((m.nCalc / m.gpuTime) / (1000 * 1000)).toFixed(3)}GFLOPS`;
                 }
 
-                let diff = (use_random || m.obj['y'] == undefined ? "" : `diff:${m.diff(y)}`);
+                let diff = (use_random || i_latent != 0 || m.obj['y'] == undefined ? "" : `diff:${m.diff(y)}`);
                 log(`FW ${m.shortType()} ${gpu_shape} ${gpu_time} ${diff}`);
             }
         }
@@ -1390,7 +1373,6 @@ function putImage(t: Tensor){
 function main(generator: ImageGenerator, latents: Tensor){
     makeModuleTable();
 
-    let i_latent = 0;
     let prev_running = null;
     let running_yield = 0;
     nCalcAll = 0;
