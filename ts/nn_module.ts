@@ -15,7 +15,7 @@ function setRandom(v: Float32Array){
 
 
 
-function gpuConv2d(x: Tensor, weight: Tensor){
+function makeConv2dPkg(x: Tensor, weight: Tensor){
     let [N, iC, H, W] = x.shape
     let [N2, oC, iC2, kH, kW] = weight.shape;
 
@@ -88,9 +88,8 @@ function gpuConv2d(x: Tensor, weight: Tensor){
     return pkg;
 }
 
-function drawSceneOnLaptopScreen(pkg: Package2) {
+function drawFrameBuffer(pkg: Package2) {
     let [buf_h, buf_w] = [pkg.buf_h, pkg.buf_w];
-
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -98,34 +97,30 @@ function drawSceneOnLaptopScreen(pkg: Package2) {
     let format;
     let type;
 
+    let start = Date.now();
     if(floatFB){
 
         dt = new Float32Array(4 * buf_w * buf_h);
         if(Red){
 
-            format = gl.RED;
+            gl.readPixels(0, 0, buf_w, buf_h, gl.RED, gl.FLOAT, dt); chk();
         }
         else{
 
-            format = gl.RGBA;
+            gl.readPixels(0, 0, buf_w, buf_h, gl.RGBA, gl.FLOAT, dt); chk();
         }
-        type = gl.FLOAT;
     }
     else{
 
         dt = new Uint8Array(buf_w * buf_h * 4);
-        format = gl.RGBA;
-        type = gl.UNSIGNED_BYTE;
+        gl.readPixels(0, 0, buf_w, buf_h, gl.RGBA, gl.UNSIGNED_BYTE, dt); chk();
     }
 
-    gl.bindTexture(gl.TEXTURE_2D, null);
+    // gl.bindTexture(gl.TEXTURE_2D, null);
 
-    let start = Date.now();
-    gl.readPixels(0, 0, buf_w, buf_h, format, type, dt); chk();
     log(`time :${Date.now() - start}`)    
     
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
 
     return dt;
 }
@@ -224,11 +219,47 @@ class Package2 extends Package {
         }
     }
 
+    makeFramebuffer() {
+        let [buf_h, buf_w] = [this.buf_h, this.buf_w];
+
+        this.frameBuffer = gl.createFramebuffer(); chk();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.frameBuffer); chk();
+    
+        this.frameBufferTexture = gl.createTexture(); chk();
+    
+        // 指定した位置のテクスチャをアクティブにする。
+        gl.activeTexture(gpgpu.TEXTUREs[ this.textures.length ]); chk();
+    
+        gl.bindTexture(gl.TEXTURE_2D, this.frameBufferTexture); chk();
+    
+        if(floatFB){
+    
+            if(Red){
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F   , buf_w, buf_h, 0, gl.RED , gl.FLOAT, null); chk();
+            }
+            else{
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, buf_w, buf_h, 0, gl.RGBA, gl.FLOAT, null); chk();
+            }
+        }
+        else{
+    
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, buf_w, buf_h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);chk();
+        }
+    
+        this.renderBuffer = gl.createRenderbuffer(); chk();
+        gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderBuffer); chk();
+    
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.frameBufferTexture, 0); chk();
+    
+        gl.bindTexture(gl.TEXTURE_2D, null); chk();
+        gl.bindRenderbuffer(gl.RENDERBUFFER, null); chk();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); chk();
+    }
 }
 
-function makeMulPackage() : [Package2, Float32Array, Float32Array] {
-    let buf_h = 1000;
-    let buf_w = 1000;
+function makeMulPkg() : [Package2, Float32Array, Float32Array] {
+    let buf_h = 100;
+    let buf_w = 100;
 
 
     let fragment_shader = `
@@ -399,9 +430,10 @@ class GPGPU2 extends GPGPU {
 
     constructor(canvas: HTMLCanvasElement, ui3d: UI3D = undefined){
         super(canvas, ui3d);
+        this.makeVertexPositionBuffer();
     }
 
-    initBuffers() {
+    makeVertexPositionBuffer() {
         let sz = 1.0;
         let vertices = [
             // Front face
@@ -411,60 +443,24 @@ class GPGPU2 extends GPGPU {
              sz,  sz,  -0.0,
         ];
         
-        this.vertexPositionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+        this.vertexPositionBuffer = gl.createBuffer(); chk();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer); chk();
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW); chk();
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, null); chk();
     }
 
-    makeFramebuffer(pkg: Package2) {
-        let [buf_h, buf_w] = [pkg.buf_h, pkg.buf_w];
-
-        pkg.frameBuffer = gl.createFramebuffer(); chk();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, pkg.frameBuffer); chk();
-    
-        pkg.frameBufferTexture = gl.createTexture(); chk();
-    
-        // 指定した位置のテクスチャをアクティブにする。
-        gl.activeTexture(gpgpu.TEXTUREs[ pkg.textures.length ]); chk();
-    
-        gl.bindTexture(gl.TEXTURE_2D, pkg.frameBufferTexture); chk();
-    
-        if(floatFB){
-    
-            if(Red){
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F   , buf_w, buf_h, 0, gl.RED , gl.FLOAT, null); chk();
-            }
-            else{
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, buf_w, buf_h, 0, gl.RGBA, gl.FLOAT, null); chk();
-            }
-        }
-        else{
-    
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, buf_w, buf_h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);chk();
-        }
-    
-        pkg.renderBuffer = gl.createRenderbuffer(); chk();
-        gl.bindRenderbuffer(gl.RENDERBUFFER, pkg.renderBuffer); chk();
-    
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pkg.frameBufferTexture, 0); chk();
-    
-        gl.bindTexture(gl.TEXTURE_2D, null); chk();
-        gl.bindRenderbuffer(gl.RENDERBUFFER, null); chk();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null); chk();
-    }    
-
     prepare(pkg: Package2){
-        this.initBuffers();
 
         this.makePackage(pkg);
 
         this.makeTexture(pkg);
         this.setTextureData(pkg);
 
-        pkg.vertexAttrLoc = gl.getAttribLocation(pkg.program, "aVertexPosition"); chk();
+        pkg.vertexAttrLoc = gl.getAttribLocation(pkg.program, "in_position"); chk();
         gl.enableVertexAttribArray(pkg.vertexAttrLoc); chk();
 
-        this.makeFramebuffer(pkg);
+        pkg.makeFramebuffer();
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, pkg.frameBuffer); chk();
 
@@ -481,18 +477,17 @@ export function gpuBodyOnLoad(){
     gpgpu = new GPGPU2(canvas);
  
     {
-        let [H, W] = [1024, 1024];
+        let [H, W] = [100, 100];
         let [oC, iC, kH, kW] = [ 16, 16, 3, 3 ];
 
-        // COI:[32 x 32(4)] HW:[1024 x 1024] kHW:[3 x 3]
         let x = new Tensor([1, iC, H, W]);
         let weight = new Tensor([1, oC, iC, kH, kW]);
 
         setRandom(x.data);
         setRandom(weight.data);
-        let pkg = gpuConv2d(x, weight);
+        let pkg = makeConv2dPkg(x, weight);
         gpgpu.prepare(pkg);
-        let dt = drawSceneOnLaptopScreen(pkg);
+        let dt = drawFrameBuffer(pkg);
         pkg.clear();
 
         checkIdx(pkg, dt);
@@ -501,7 +496,7 @@ export function gpuBodyOnLoad(){
 
     {
         log("\n--------------------------------------------------\n");
-        let [pkg, A, B] = makeMulPackage();
+        let [pkg, A, B] = makeMulPkg();
         gpgpu.prepare(pkg);
         runMul(pkg, A, B);
         pkg.clear();

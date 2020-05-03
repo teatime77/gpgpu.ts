@@ -1,5 +1,5 @@
 // import {CreateNeuralNetworkShaders} from "shader.js";
-import {GPGPU, Package, CreateGPGPU, gl, chk} from "./gpgpu.js";
+import {GPGPU, Package, CreateGPGPU, gl, chk } from "./gpgpu.js";
 
 let i_latent = 0;
 
@@ -868,9 +868,10 @@ class ConvTranspose2d extends Module {
             y = sum + zero;
         }`;
 
-        let y = new Tensor([N, oC, oH, oW])
+        let y  = new Tensor([N, oC, oH, oW]);
+        let y2 = new Float32Array(y.data.length);
 
-        let zero    = (new Float32Array(y.data.length)).map(a => 0);
+        let zero    = new Float32Array(y.data.length);
 
         let pkg = new Package({
             id : `${this.name}`,
@@ -880,7 +881,7 @@ class ConvTranspose2d extends Module {
                 "zero"  : zero,
                 "x"     : gpgpu.makeTextureInfo("float", [iC, iH, iW], x.data),
                 "weight": gpgpu.makeTextureInfo("float", [oC, iC, kH * kW], weight.data),
-                "y"     : y.data
+                "y"     : y2
             }
         });
 
@@ -889,18 +890,16 @@ class ConvTranspose2d extends Module {
         this.gpuTime = 0;
 
         for(let idx = 0; idx * iCmini < iC; idx++){
-            if(idx != 0){
-                for(let i = 0; i < zero.length; i++){
-                    zero[i] = y.data[i];
-                }
-            }
-
             pkg.args["in_channel_base"] = idx * iCmini;
 
 
             let startTime = Date.now(); 
             gpgpu.compute(pkg);
             this.gpuTime += Date.now() - startTime;
+
+            for(let i = 0; i < y2.length; i++){
+                y.data[i] += y2[i];
+            }
 
             yield;
         }
@@ -1112,8 +1111,9 @@ class Conv2d extends Module {
         }
 
         let y  = new Tensor([N, oC, H, W]);
+        let y2 = new Float32Array(y.data.length);
 
-        let zero    = (new Float32Array(y.data.length)).map(a => 0);
+        let zero    = new Float32Array(y.data.length);
 
         let pkg = new Package({
             id : `${this.name}`,
@@ -1123,7 +1123,7 @@ class Conv2d extends Module {
                 "zero"  : zero,
                 "x"     : gpgpu.makeTextureInfo("float", [iC, H, W], x.data),
                 "weight": gpgpu.makeTextureInfo(weight2_texelType, weight2_shape, weight.data),
-                "y"     : y.data
+                "y"     : y2
             }
         });
 
@@ -1131,18 +1131,16 @@ class Conv2d extends Module {
 
         this.gpuTime = 0;
         for(let idx = 0; idx * iCmini < iC; idx++){
-            if(idx != 0){
-                for(let i = 0; i < zero.length; i++){
-                    zero[i] = y.data[i];
-                }
-            }
-
             pkg.args["in_channel_base"] = idx * iCmini;
 
             let startTime = Date.now(); 
             gpgpu.compute(pkg);
             this.gpuTime += Date.now() - startTime;
         
+            for(let i = 0; i < y2.length; i++){
+                y.data[i] += y2[i];
+            }
+
             yield;
         }
 

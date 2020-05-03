@@ -569,10 +569,10 @@ export class GPGPU {
         `;
 
     static readonly vertexPositionShader = `
-        in vec3 aVertexPosition;
+        in vec3 in_position;
                 
         void main(void) {
-            gl_Position = vec4(aVertexPosition, 1.0);
+            gl_Position = vec4(in_position, 1.0);
         }`;
 
     canvas: HTMLCanvasElement;
