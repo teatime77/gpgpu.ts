@@ -5,15 +5,6 @@ import { Tensor } from "./tensor.js";
 
 let gpgpu: GPGPU2;
 
-let sz = 1.0;
-let vertices = [
-    // Front face
-    -sz, -sz,  -0.0,
-     sz, -sz,  -0.0,
-    -sz,  sz,  -0.0,
-     sz,  sz,  -0.0,
-];
-
 function setRandom(v: Float32Array){
     for(let i = 0; i < v.length; i++){
         v[i] = 2 * Math.random() - 1;
@@ -139,7 +130,6 @@ function drawSceneOnLaptopScreen(pkg: Package2) {
     return dt;
 }
 
-
 function checkConv2(pkg: Package2, x: Tensor, weight: Tensor, dt: Float32Array){
     let [buf_h, buf_w] = [pkg.buf_h, pkg.buf_w];
 
@@ -203,13 +193,37 @@ function log(s){
     console.log(s);
 }
 
-let cubeVertexPositionBuffer;
-
 class Package2 extends Package {
     buf_w = 1000;// 1024;
     buf_h = 1000;//2048;
     vertexAttrLoc: number;
     out: Float32Array;
+
+    frameBuffer: WebGLFramebuffer;
+    frameBufferTexture: WebGLTexture;
+    renderBuffer : WebGLRenderbuffer;
+
+    constructor(obj: any = undefined){
+        super(undefined);
+        if(obj != undefined){
+            Object.assign(this, obj);
+        }
+    }
+
+    clear(){
+        super.clear();
+
+        if(this.frameBuffer){
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null); chk();
+            gl.bindRenderbuffer(gl.RENDERBUFFER, null); chk();
+
+            gl.deleteFramebuffer(this.frameBuffer); chk();
+            gl.deleteTexture(this.frameBufferTexture); chk();
+            gl.deleteRenderbuffer(this.renderBuffer); chk();
+        }
+    }
+
 }
 
 function makeMulPackage() : [Package2, Float32Array, Float32Array] {
@@ -381,14 +395,24 @@ function checkMul(pkg: Package2, C2: Float32Array, dt: Float32Array){
 }
 
 class GPGPU2 extends GPGPU {
+    vertexPositionBuffer : WebGLBuffer;
 
     constructor(canvas: HTMLCanvasElement, ui3d: UI3D = undefined){
         super(canvas, ui3d);
     }
 
     initBuffers() {
-        cubeVertexPositionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexPositionBuffer);
+        let sz = 1.0;
+        let vertices = [
+            // Front face
+            -sz, -sz,  -0.0,
+             sz, -sz,  -0.0,
+            -sz,  sz,  -0.0,
+             sz,  sz,  -0.0,
+        ];
+        
+        this.vertexPositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
     }
 
@@ -447,7 +471,7 @@ class GPGPU2 extends GPGPU {
         gl.viewport(0, 0, pkg.buf_w, pkg.buf_h); chk();
         gl.clear(gl.COLOR_BUFFER_BIT); chk();
     
-        gl.bindBuffer(gl.ARRAY_BUFFER, cubeVertexPositionBuffer); chk();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexPositionBuffer); chk();
         gl.vertexAttribPointer(pkg.vertexAttrLoc, 3, gl.FLOAT, false, 0, 0); chk();
     }
 }
@@ -469,7 +493,7 @@ export function gpuBodyOnLoad(){
         let pkg = gpuConv2d(x, weight);
         gpgpu.prepare(pkg);
         let dt = drawSceneOnLaptopScreen(pkg);
-        gpgpu.clear(pkg);
+        pkg.clear();
 
         checkIdx(pkg, dt);
         checkConv2(pkg, x, weight, dt);
@@ -480,7 +504,7 @@ export function gpuBodyOnLoad(){
         let [pkg, A, B] = makeMulPackage();
         gpgpu.prepare(pkg);
         runMul(pkg, A, B);
-        gpgpu.clear(pkg);
+        pkg.clear();
     }
 
 }

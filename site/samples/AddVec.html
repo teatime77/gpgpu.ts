@@ -8,7 +8,7 @@
 <script type="module" src="../js/gpgpu.js?ver=1" ></script>
 
 <script type="module">
-    import {CreateGPGPU} from "../js/gpgpu.js";
+    import {CreateGPGPU, Package } from "../js/gpgpu.js";
 
     function onBodyLoad() {
     // 頂点シェーダのプログラムは文字列で記述します。
@@ -41,7 +41,7 @@
     var gpgpu = CreateGPGPU();
 
     // 計算のパラメータを作ります。
-    var pkg = {
+    var pkg = new Package({
         // idはプログラム内でユニークであれば何でも構いません。
         id: "AddVec",
 
@@ -54,13 +54,13 @@
             "B": B,
             "C": C,
         }
-    };
+    });
 
     // パラメータを使い計算します。
     gpgpu.compute(pkg);
 
     // WebGLのオブジェクトをクリアします。
-    gpgpu.clear(pkg);
+    pkg.clear();
 
     // 計算結果を表示します。
     document.body.insertAdjacentHTML("beforeend", "<p>A = " + A.join(' ') + "</p>");

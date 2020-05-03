@@ -8,7 +8,7 @@
 <script type="module" src="../js/gpgpu.js?ver=1" ></script>
 
 <script type="module">
-    import {CreateGPGPU} from "../js/gpgpu.js";
+    import {CreateGPGPU, Package} from "../js/gpgpu.js";
 
     function MatStr(m, nrow, ncol, row_major_order) {
         var s = "";
@@ -87,7 +87,7 @@
         var gpgpu = CreateGPGPU();
 
         // 計算のパラメータ
-        var pkg = {
+        var pkg = new Package({
             // idはプログラム内でユニークであれば何でも構いません。
             id: "TexMulMatVec4",
 
@@ -104,13 +104,13 @@
                 "B": gpgpu.makeTextureInfo("vec4", [2, 2], B),
                 "C": C,
             }
-        };
+        });
 
         // パラメータを使い計算します。
         gpgpu.compute(pkg);
 
         // WebGLのオブジェクトをクリアします。
-        gpgpu.clear(pkg);
+        pkg.clear();
 
         // 計算結果を表示します。
         document.body.insertAdjacentHTML("beforeend", "<p>A = <br/>" + MatStr(A, 2, 8, true) + "</p>");

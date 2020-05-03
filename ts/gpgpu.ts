@@ -230,16 +230,60 @@ export class Package{
     program: WebGLProgram;
     transformFeedback: WebGLTransformFeedback;
 
-    frameBuffer: WebGLFramebuffer;
-    frameBufferTexture: WebGLTexture;
-    renderBuffer : WebGLRenderbuffer;
-
     vertexIndexBufferInf: WebGLBuffer;
     textures: TextureInfo[];
     attribElementCount: number;
     varyings: ArgInf[];
     attributes: ArgInf[];
     uniforms: ArgInf[];
+
+    constructor(obj: any = undefined){
+        if(obj != undefined){
+            Object.assign(this, obj);
+        }
+    }
+
+
+    /*
+        指定したidのWebGLのオブジェクトをすべて削除します。
+    */
+    clear() {
+        // 指定したidのパッケージがある場合
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, null); chk();
+
+        // テクスチャのバインドを解く。
+        gl.bindTexture(gl.TEXTURE_2D, null); chk();
+        gl.bindTexture(gl.TEXTURE_3D, null); chk();
+
+        if (this.vertexIndexBufferInf) {
+
+            // バッファを削除する。
+            gl.deleteBuffer(this.vertexIndexBufferInf); chk();
+        }
+
+        // すべてのvarying変数に対し
+        for (let varying of this.varyings) {
+            if (varying.feedbackBuffer) {
+                // Transform Feedbackバッファがある場合
+
+                // バッファを削除する。
+                gl.deleteBuffer(varying.feedbackBuffer); chk();
+            }
+        }
+
+        if (this.transformFeedback) {
+            // Transform Feedbackがある場合
+
+            gl.deleteTransformFeedback(this.transformFeedback); chk();
+        }
+
+        // すべてのテクスチャを削除する。
+        this.textures.forEach(x => gl.deleteTexture(x.Texture), chk())
+
+        // プログラムを削除する。
+        gl.deleteProgram(this.program); chk();
+    }
 }
 
 /*
@@ -606,61 +650,10 @@ export class GPGPU {
     */
     clearAll() {
         for(let pkg of this.packages){
-            this.clear(pkg);
+            pkg.clear();
         }
 
         this.packages = [];
-    }
-
-    /*
-        指定したidのWebGLのオブジェクトをすべて削除します。
-    */
-    clear(pkg: Package) {
-        // 指定したidのパッケージがある場合
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, null); chk();
-
-        // テクスチャのバインドを解く。
-        gl.bindTexture(gl.TEXTURE_2D, null); chk();
-        gl.bindTexture(gl.TEXTURE_3D, null); chk();
-
-        if (pkg.vertexIndexBufferInf) {
-
-            // バッファを削除する。
-            gl.deleteBuffer(pkg.vertexIndexBufferInf); chk();
-        }
-
-        // すべてのvarying変数に対し
-        for (let varying of pkg.varyings) {
-            if (varying.feedbackBuffer) {
-                // Transform Feedbackバッファがある場合
-
-                // バッファを削除する。
-                gl.deleteBuffer(varying.feedbackBuffer); chk();
-            }
-        }
-
-        if (pkg.transformFeedback) {
-            // Transform Feedbackがある場合
-
-            gl.deleteTransformFeedback(pkg.transformFeedback); chk();
-        }
-
-        if(pkg.frameBuffer){
-
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null); chk();
-            gl.bindRenderbuffer(gl.RENDERBUFFER, null); chk();
-
-            gl.deleteFramebuffer(pkg.frameBuffer); chk();
-            gl.deleteTexture(pkg.frameBufferTexture); chk();
-            gl.deleteRenderbuffer(pkg.renderBuffer); chk();
-        }
-
-        // すべてのテクスチャを削除する。
-        pkg.textures.forEach(x => gl.deleteTexture(x.Texture), chk())
-
-        // プログラムを削除する。
-        gl.deleteProgram(pkg.program); chk();
     }
 
     /*

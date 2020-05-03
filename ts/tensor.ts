@@ -535,7 +535,7 @@ class EqualizedFullyConnect extends Module {
         this.gpuTime = 0;
 
         // 計算のパラメータ
-        let pkg = {
+        let pkg = new Package({
             // idはプログラム内でユニークであれば何でも構いません。
             id: "TexMulMat",
 
@@ -551,7 +551,7 @@ class EqualizedFullyConnect extends Module {
                 "B": gpgpu.makeTextureInfo("float", [x.shape[1], 1], x.data),
                 "C": y.data,
             }
-        } as any as Package;
+        });
 
         // パラメータを使い計算します。
         let startTime = Date.now(); 
@@ -559,7 +559,7 @@ class EqualizedFullyConnect extends Module {
         this.gpuTime += Date.now() - startTime;
 
         // WebGLのオブジェクトをクリアします。
-        gpgpu.clear(pkg);
+        pkg.clear();
 
         // log(`FW ${this.name} ${this.type} x:${x.shape_last()} y:${this.diff(y)}`)
         this.nCalc = y.data.length * (this.weight.shape[1] * x.shape[1]);
@@ -699,7 +699,7 @@ class FusedBlur3x3 extends Module {
     
 
         this.gpuTime = 0;
-        let pkg = {
+        let pkg = new Package({
             id : `${this.name}`,
             vertexShader: shader_src,
             args : {
@@ -708,14 +708,14 @@ class FusedBlur3x3 extends Module {
                 "weight": gpgpu.makeTextureInfo("float", [iC, kH, kW], weight.data),
                 "y"     : y.data
             }
-        } as any as Package;
+        });
 
         let startTime = Date.now(); 
         gpgpu.compute(pkg);
         this.gpuTime += Date.now() - startTime;
         this.nCalc = (oC * oH * oW) * (iC * kH * kW);
 
-        gpgpu.clear(pkg);
+        pkg.clear();
 
         return y;
     }
@@ -872,7 +872,7 @@ class ConvTranspose2d extends Module {
 
         let zero    = (new Float32Array(y.data.length)).map(a => 0);
 
-        let pkg = {
+        let pkg = new Package({
             id : `${this.name}`,
             vertexShader: shader_src,
             args : {
@@ -882,7 +882,7 @@ class ConvTranspose2d extends Module {
                 "weight": gpgpu.makeTextureInfo("float", [oC, iC, kH * kW], weight.data),
                 "y"     : y.data
             }
-        } as any as Package;
+        });
 
         gpgpu.makePackage(pkg);
 
@@ -904,7 +904,7 @@ class ConvTranspose2d extends Module {
 
             yield;
         }
-        gpgpu.clear(pkg);
+        pkg.clear();
 
         yield y;
     }
@@ -1115,7 +1115,7 @@ class Conv2d extends Module {
 
         let zero    = (new Float32Array(y.data.length)).map(a => 0);
 
-        let pkg = {
+        let pkg = new Package({
             id : `${this.name}`,
             vertexShader: shader_src,
             args : {
@@ -1125,7 +1125,7 @@ class Conv2d extends Module {
                 "weight": gpgpu.makeTextureInfo(weight2_texelType, weight2_shape, weight.data),
                 "y"     : y.data
             }
-        } as any as Package;
+        });
 
         gpgpu.makePackage(pkg);
 
@@ -1146,7 +1146,7 @@ class Conv2d extends Module {
             yield;
         }
 
-        gpgpu.clear(pkg);
+        pkg.clear();
 
         yield y;
     }

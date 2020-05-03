@@ -8,7 +8,7 @@
 <script type="module" src="../js/gpgpu.js?ver=1" ></script>
 
 <script type="module">
-    import {CreateGPGPU} from "../js/gpgpu.js";
+    import {CreateGPGPU, Package} from "../js/gpgpu.js";
     
     function MatStr(m, nrow, ncol, row_major_order) {
         var s = "";
@@ -57,7 +57,7 @@
     var C = new Float32Array(6);
 
     // 計算のパラメータ
-    var pkg = {
+    var pkg = new Package({
         // idはプログラム内でユニークであれば何でも構いません。
         id: "UniMulMat",
 
@@ -70,7 +70,7 @@
             "B": B,
             "C": C,
         }
-    };
+    });
 
     // GPGPUのオブジェクトを作ります。
     var gpgpu = CreateGPGPU();
@@ -79,7 +79,7 @@
     gpgpu.compute(pkg);
 
     // WebGLのオブジェクトをクリアします。
-    gpgpu.clear(pkg);
+    pkg.clear();
 
     // 計算結果を表示します。
     document.body.insertAdjacentHTML("beforeend", "<p>A = <br/>[" + A.slice(0, 3).join(' ') + "]<br/>[" + A.slice(3, 6).join(' ') + "]</p>");
