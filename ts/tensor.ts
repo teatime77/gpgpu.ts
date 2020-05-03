@@ -658,32 +658,32 @@ class FusedBlur3x3 extends Module {
         out float y;
         
         void main() {
-            uint idx = uint(gl_VertexID);
+            int idx = int(gl_VertexID);
         
-            uint channel_idx = idx / (numOutRows * numOutCols);
+            int channel_idx = idx / (numOutRows * numOutCols);
             idx -= channel_idx * (numOutRows * numOutCols);
         
-            uint r1 = idx / numOutCols;
-            uint c1 = idx - r1 * numOutCols;
+            int r1 = idx / numOutCols;
+            int c1 = idx - r1 * numOutCols;
         
             float sum = 0.0f;
         
-            uint r2, c2;
+            int r2, c2;
         
-            for (r2 = 0u; r2 < kernelH; r2++) {
+            for (r2 = 0; r2 < kernelH; r2++) {
         
-                for (c2 = 0u; c2 < kernelW; c2++) {
+                for (c2 = 0; c2 < kernelW; c2++) {
         
-                    // uint c3 = c1 + c2 - (kernelW - 1u);
-                    // uint r3 = r1 + r2 - (kernelH - 1u);
-                    uint c3 = c1 + c2 - 1u;
-                    uint r3 = r1 + r2 - 1u;
+                    // int c3 = c1 + c2 - (kernelW - 1);
+                    // int r3 = r1 + r2 - (kernelH - 1);
+                    int c3 = c1 + c2 - 1;
+                    int r3 = r1 + r2 - 1;
         
-                    if(0u <= c3 && c3 < numInCols && 0u <= r3 && r3 < numInRows){
+                    if(0 <= c3 && c3 < numInCols && 0 <= r3 && r3 < numInRows){
         
                         vec4 txl = texelFetch(x    , ivec3(c3, r3, channel_idx), 0);
         
-                        vec4  w = texelFetch(weight, ivec3(kernelW - 1u - c2, kernelH - 1u - r2, channel_idx), 0);
+                        vec4  w = texelFetch(weight, ivec3(kernelW - 1 - c2, kernelH - 1 - r2, channel_idx), 0);
                         // vec4  w = texelFetch(weight, ivec3(c2, r2, channel_idx), 0);
         
                         sum += txl.r * w.r;
@@ -695,12 +695,12 @@ class FusedBlur3x3 extends Module {
         }`;
 
         var shader_src = Conv2dGroup
-            .replace(/numInRows/g, `${iH}u`)
-            .replace(/numInCols/g, `${iW}u`)
-            .replace(/numOutRows/g, `${oH}u`)
-            .replace(/numOutCols/g, `${oW}u`)
-            .replace(/kernelH/g, `${kH}u`)
-            .replace(/kernelW/g, `${kW}u`);
+            .replace(/numInRows/g, `${iH}`)
+            .replace(/numInCols/g, `${iW}`)
+            .replace(/numOutRows/g, `${oH}`)
+            .replace(/numOutCols/g, `${oW}`)
+            .replace(/kernelH/g, `${kH}`)
+            .replace(/kernelW/g, `${kW}`);
 
         var y = new Tensor([N, oC, oH, oW])
         let zero = new Float32Array(y.data.length);
