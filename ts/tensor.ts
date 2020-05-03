@@ -310,51 +310,6 @@ class Module {
         return `${diff.toFixed(7)}`;
     }
 
-    /*
-        GPUによる順伝播
-    */
-    gpuConv2dGroup(x: Tensor, weight: Tensor, padding: number, groups: number) : Tensor {
-        let [N, iC, iH, iW] = x.shape
-        let [oC, iC2, kH, kW] = weight.shape;
-
-        console.assert(padding == 1 && groups == iC && iC == oC && iC2 == 1);
-
-        let oH = iH + 2 * padding - (kH - 1) - 1 + 1;
-        let oW = iW + 2 * padding - (kW - 1) - 1 + 1;
-
-        var y = new Tensor([N, oC, oH, oW])
-        let zero = new Float32Array(y.data.length);
-
-        var shader_src = Conv2dGroup
-            .replace(/numInRows/g, `${iH}u`)
-            .replace(/numInCols/g, `${iW}u`)
-            .replace(/numOutRows/g, `${oH}u`)
-            .replace(/numOutCols/g, `${oW}u`)
-            .replace(/kernelH/g, `${kH}u`)
-            .replace(/kernelW/g, `${kW}u`);
-
-        this.gpuTime = 0;
-        let pkg = {
-            id : `${this.name}`,
-            vertexShader: shader_src,
-            args : {
-                "zero"  : zero,
-                "x"     : gpgpu.makeTextureInfo("float", [iC, iH, iW], x.data),
-                "weight": gpgpu.makeTextureInfo("float", [iC, kH, kW], weight.data),
-                "y"     : y.data
-            }
-        } as any as Package;
-
-        let startTime = Date.now(); 
-        gpgpu.compute(pkg);
-        this.gpuTime += Date.now() - startTime;
-        this.nCalc = (oC * oH * oW) * (iC * kH * kW);
-
-        gpgpu.clear(pkg);
-
-        return y;
-    }
-
     shortType() : string {
         switch(this.type){
         case "PixelwiseNormalization": return "norm";
@@ -529,6 +484,49 @@ class EqualizedFullyConnect extends Module {
 
         console.assert(x.shape[0] == 1);
 
+        let Linear = `
+        in float zero;
+        
+        // 2次元配列のテクスチャ
+        uniform sampler2D A;
+        uniform sampler2D B;
+        
+         // 出力変数C
+        out float C;
+        
+        void main() {
+            // テクスチャBの行数と列数を取得します。
+            // B_sz.yが行数、B_sz.xが列数です。
+            ivec2 B_sz = textureSize(B, 0);
+        
+            // 出力する行列Cの行(row)と列(col)を計算します。
+            // gl_VertexIDは入力変数の何番目の要素かを示すシステム変数です。
+            int row = gl_VertexID / B_sz.x;
+            int col = gl_VertexID % B_sz.x;
+        
+            // Cのrow行col列の値は、Aのrow行のベクトルとBのcol列のベクトルの内積です。
+        
+            // 以下のループでベクトルの内積を計算します。
+            float sum = 0.0f;
+            for(int i = 0; i < B_sz.y; i++) {
+        
+                // Aのrow行i列の値を取得します。
+                vec4 a = texelFetch(A, ivec2(i, row), 0);
+        
+                // Bのi行col列の値を取得します。
+                vec4 b = texelFetch(B, ivec2(col, i), 0);
+        
+                // a.rとb.rに取得した値が入っています。
+                sum += a.r * b.r;
+            }
+        
+            // 入力変数zeroの値は必要ないですが、使用しない変数はコンパイラが除去してしまいエラーになるので形の上だけ使用します。
+            // zeroの値は0なので計算結果には影響しません。
+            C = sum + zero;
+        }`;
+
+
+
         // 出力変数Cは配列のサイズ(2 * 2)を指定して作ります。
         let y = new Tensor([x.shape[0], this.weight.shape[0]], new Float32Array(x.shape[0] * this.weight.shape[0]));
 
@@ -605,7 +603,6 @@ class PixelwiseNoise extends Module {
 
         let y = x.add(this.noise);
 
-        // log(`FW ${this.name} ${this.type} noise:${this.noise.shape_last()} y:${this.diff(y)}`)
         yield y;
     }
 }
@@ -636,9 +633,101 @@ class FusedBlur3x3 extends Module {
 
         let y = this.gpuConv2dGroup(x, this.kernel, this.padding, this.groups);
 
-        // log(`FW ${this.name} ${this.type} y:${this.diff(y)} sum:${sum}`)
         yield y;
     }
+
+    /*
+        GPUによる順伝播
+    */
+   gpuConv2dGroup(x: Tensor, weight: Tensor, padding: number, groups: number) : Tensor {
+        let [N, iC, iH, iW] = x.shape
+        let [oC, iC2, kH, kW] = weight.shape;
+
+        console.assert(padding == 1 && groups == iC && iC == oC && iC2 == 1);
+
+        let oH = iH + 2 * padding - (kH - 1) - 1 + 1;
+        let oW = iW + 2 * padding - (kW - 1) - 1 + 1;
+
+        let Conv2dGroup = `
+        precision highp sampler3D;
+        
+        uniform sampler3D weight;
+        uniform sampler3D x;
+        
+        in  float zero;
+        out float y;
+        
+        void main() {
+            uint idx = uint(gl_VertexID);
+        
+            uint channel_idx = idx / (numOutRows * numOutCols);
+            idx -= channel_idx * (numOutRows * numOutCols);
+        
+            uint r1 = idx / numOutCols;
+            uint c1 = idx - r1 * numOutCols;
+        
+            float sum = 0.0f;
+        
+            uint r2, c2;
+        
+            for (r2 = 0u; r2 < kernelH; r2++) {
+        
+                for (c2 = 0u; c2 < kernelW; c2++) {
+        
+                    // uint c3 = c1 + c2 - (kernelW - 1u);
+                    // uint r3 = r1 + r2 - (kernelH - 1u);
+                    uint c3 = c1 + c2 - 1u;
+                    uint r3 = r1 + r2 - 1u;
+        
+                    if(0u <= c3 && c3 < numInCols && 0u <= r3 && r3 < numInRows){
+        
+                        vec4 txl = texelFetch(x    , ivec3(c3, r3, channel_idx), 0);
+        
+                        vec4  w = texelFetch(weight, ivec3(kernelW - 1u - c2, kernelH - 1u - r2, channel_idx), 0);
+                        // vec4  w = texelFetch(weight, ivec3(c2, r2, channel_idx), 0);
+        
+                        sum += txl.r * w.r;
+                    }
+                }
+            }
+        
+            y = sum + zero;
+        }`;
+
+        var shader_src = Conv2dGroup
+            .replace(/numInRows/g, `${iH}u`)
+            .replace(/numInCols/g, `${iW}u`)
+            .replace(/numOutRows/g, `${oH}u`)
+            .replace(/numOutCols/g, `${oW}u`)
+            .replace(/kernelH/g, `${kH}u`)
+            .replace(/kernelW/g, `${kW}u`);
+
+        var y = new Tensor([N, oC, oH, oW])
+        let zero = new Float32Array(y.data.length);
+    
+
+        this.gpuTime = 0;
+        let pkg = {
+            id : `${this.name}`,
+            vertexShader: shader_src,
+            args : {
+                "zero"  : zero,
+                "x"     : gpgpu.makeTextureInfo("float", [iC, iH, iW], x.data),
+                "weight": gpgpu.makeTextureInfo("float", [iC, kH, kW], weight.data),
+                "y"     : y.data
+            }
+        } as any as Package;
+
+        let startTime = Date.now(); 
+        gpgpu.compute(pkg);
+        this.gpuTime += Date.now() - startTime;
+        this.nCalc = (oC * oH * oW) * (iC * kH * kW);
+
+        gpgpu.clear(pkg);
+
+        return y;
+    }
+
 }
 
 class ConvTranspose2d extends Module {
@@ -734,6 +823,59 @@ class ConvTranspose2d extends Module {
 
         this.gpuShape = `COI:[${oC} x ${iC}(${iCmini})] HW:[${oH} x ${oW}] kHW:[${kH} x ${kW}] mem:${(mem/(1000*1000)).toFixed(1)}`;
         
+
+        let ConvTranspose2dShader = `
+        precision highp sampler3D;
+        
+        uniform sampler3D weight;
+        uniform sampler3D x;
+        uniform int in_channel_base;
+        
+        in  float zero;
+        out float y;
+        
+        void main() {
+            int idx = int(gl_VertexID);
+        
+            int num_in_rows_ex = 2 * numInRows - 1;
+            int num_in_cols_ex = 2 * numInCols - 1;
+        
+            int out_channel_idx = idx / (numOutRows * numOutCols);
+            idx -= out_channel_idx * (numOutRows * numOutCols);
+        
+            int r1 = idx / numOutCols;
+            int c1 = idx - r1 * numOutCols;
+        
+            float sum = 0.0f;
+            for(int in_channel_offset = 0; in_channel_offset < numInChannel; in_channel_offset++) {
+                int in_channel_idx = in_channel_base + in_channel_offset;
+            
+                for (int r2 = 0; r2 < kernelH; r2++) {
+        
+                    for (int c2 = 0; c2 < kernelW; c2++) {
+        
+                        int c3 = c1 + c2 - (kernelW - 1);
+                        int r3 = r1 + r2 - (kernelH - 1);
+        
+                        if(0 <= c3 && c3 < num_in_cols_ex && 0 <= r3 && r3 < num_in_rows_ex && c3 % 2 == 0 && r3 % 2 == 0){
+                            c3 /= 2;
+                            r3 /= 2;
+        
+                            vec4 txl = texelFetch(x    , ivec3(c3, r3, in_channel_idx), 0);
+        
+                            vec4  w = texelFetch(weight, ivec3((kernelH - 1 - r2) * kernelW + (kernelW - 1 - c2), in_channel_idx, out_channel_idx), 0);
+                            // vec4  w = texelFetch(weight, ivec3(r2 * kernelW + c2, out_channel_idx, in_channel_idx), 0);
+                            // vec4  w = texelFetch(weight, ivec3( (kernelW - 1 - c2) * kernelH + (kernelH - 1 - r2), out_channel_idx, in_channel_idx), 0);
+        
+                            sum += txl.r * w.r;
+                        }
+                    }
+                }
+            }
+        
+            y = sum + zero;
+        }`;
+
         let shader_src = ConvTranspose2dShader
             .replace(/numInChannel/g, `${iCmini}`)
             .replace(/numInRows/g,    `${iH}`)
@@ -883,35 +1025,108 @@ class Conv2d extends Module {
         console.assert(kH == 3 && kW == 3 || kH == 1 && kW == 1);
 
         let weight2_shape;
-        let conv_shader;
+        var shader_src;
         let weight2_texelType;
-        let shiftRowsCols;
-        let shiftCols;
+
+        let shiftRowsCols = Math.log2(H * W);
+        let shiftCols = Math.log2(W);
+        console.assert(Math.round(shiftRowsCols) == shiftRowsCols && Math.round(shiftCols) == shiftCols);
+
         if(kH == 3){
 
-            conv_shader = ConvolutionalLayer;
             weight2_texelType   = "vec3";
             weight2_shape = [oC, iC, kH];
 
-            shiftRowsCols = Math.log2(H * W);
-            shiftCols = Math.log2(W);
-            console.assert(Math.round(shiftRowsCols) == shiftRowsCols && Math.round(shiftCols) == shiftCols);
+            shader_src = `
+            precision highp sampler3D;
+            
+            uniform sampler3D weight;
+            uniform sampler3D x;
+            uniform int in_channel_base;
+            
+            in  float zero;
+            out float y;
+            
+            void main() {
+                int idx = int(gl_VertexID);
+            
+                // int out_channel_idx = idx / (${H} * ${W});
+                int out_channel_idx = idx >> ${shiftRowsCols};
+                idx -= out_channel_idx * (${H} * ${W});
+            
+                // int r1 = idx / ${W};
+                int r1 = idx >> ${shiftCols};
+                int c1 = idx - r1 * ${W};
+            
+                float sum = 0.0f;
+                for(int in_channel_offset = 0; in_channel_offset < ${iCmini}; in_channel_offset++) {
+                    int in_channel_idx = in_channel_base + in_channel_offset;
+            
+                    vec4 ww[3];
+                    for (int r2 = 0; r2 < ${kH}; r2++){
+                        ww[r2]  = texelFetch(weight, ivec3(r2, in_channel_idx, out_channel_idx), 0);
+                    }
+                
+                    for (int r2 = 0; r2 < ${kH}; r2++) {
+                        int r3 = r1 + r2 - 1;
+            
+                        vec4 w = ww[r2];
+            
+                        for (int c2 = 0; c2 < ${kW}; c2++) {
+            
+                            int c3 = c1 + c2 - 1;
+            
+                            if(0 <= c3 && c3 < ${W} && 0 <= r3 && r3 < ${H}){
+            
+                                vec4 txl = texelFetch(x    , ivec3(c3, r3, in_channel_idx), 0);
+                        
+                                sum += txl.r * w[c2];
+                            }
+                        }
+                    }
+                }
+            
+                y = sum + zero;
+            }`;
         }
         else{
 
-            conv_shader = ConvolutionalLayer1x1;
             weight2_texelType   = "float";
             weight2_shape = [oC, iC];
-        }
 
-        var shader_src = conv_shader
-            .replace(/numInChannel/g, `${iCmini}`)
-            .replace(/numRows/g,      `${H}`)
-            .replace(/numCols/g,      `${W}`)
-            .replace(/shiftRowsCols/g,`${shiftRowsCols}`)
-            .replace(/shiftCols/g,    `${shiftCols}`)
-            .replace(/kernelH/g,      `${kH}`)
-            .replace(/kernelW/g,      `${kW}`);
+            shader_src = `
+            precision highp sampler3D;
+            
+            uniform sampler2D weight;
+            uniform sampler3D x;
+            uniform int in_channel_base;
+            
+            in  float zero;
+            out float y;
+            
+            void main() {
+                int idx = int(gl_VertexID);
+            
+                int out_channel_idx = idx / (${H} * ${W});
+                idx -= out_channel_idx * (${H} * ${W});
+            
+                int r1 = idx / ${W};
+                int c1 = idx - r1 * ${W};
+            
+                float sum = 0.0f;
+                for(int in_channel_offset = 0; in_channel_offset < ${iCmini}; in_channel_offset++) {
+                    int in_channel_idx = in_channel_base + in_channel_offset;
+                
+                    vec4 txl = texelFetch(x    , ivec3(c1, r1, in_channel_idx), 0);
+            
+                    vec4  w = texelFetch(weight, ivec2(in_channel_idx, out_channel_idx), 0);
+            
+                    sum += txl.r * w.r;
+                }
+            
+                y = sum + zero;
+            }`;
+        }
 
         let y  = new Tensor([N, oC, H, W]);
 
@@ -1054,302 +1269,6 @@ class ModuleList extends ModuleListSequential {
 
 class Sequential extends ModuleListSequential {
 }
-
-let Linear = `
-in float zero;
-
-// 2次元配列のテクスチャ
-uniform sampler2D A;
-uniform sampler2D B;
-
- // 出力変数C
-out float C;
-
-void main() {
-    // テクスチャBの行数と列数を取得します。
-    // B_sz.yが行数、B_sz.xが列数です。
-    ivec2 B_sz = textureSize(B, 0);
-
-    // 出力する行列Cの行(row)と列(col)を計算します。
-    // gl_VertexIDは入力変数の何番目の要素かを示すシステム変数です。
-    int row = gl_VertexID / B_sz.x;
-    int col = gl_VertexID % B_sz.x;
-
-    // Cのrow行col列の値は、Aのrow行のベクトルとBのcol列のベクトルの内積です。
-
-    // 以下のループでベクトルの内積を計算します。
-    float sum = 0.0f;
-    for(int i = 0; i < B_sz.y; i++) {
-
-        // Aのrow行i列の値を取得します。
-        vec4 a = texelFetch(A, ivec2(i, row), 0);
-
-        // Bのi行col列の値を取得します。
-        vec4 b = texelFetch(B, ivec2(col, i), 0);
-
-        // a.rとb.rに取得した値が入っています。
-        sum += a.r * b.r;
-    }
-
-    // 入力変数zeroの値は必要ないですが、使用しない変数はコンパイラが除去してしまいエラーになるので形の上だけ使用します。
-    // zeroの値は0なので計算結果には影響しません。
-    C = sum + zero;
-}`;
-
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-/*
-let ConvolutionalLayerOLD = `
-precision lowp sampler3D;
-// precision mediump sampler3D;
-// precision highp sampler3D;
-
-uniform sampler3D weight;
-uniform sampler3D x;
-
-in  float zero;
-out float y;
-
-void main() {
-    uint idx = uint(gl_VertexID);
-
-    uint out_channel_idx = idx / (numRows * numCols);
-    idx -= out_channel_idx * (numRows * numCols);
-
-    uint r1 = idx / numCols;
-    uint c1 = idx - r1 * numCols;
-
-    float sum = 0.0f;
-    // uint  in_channel_idx;
-    for(uint in_channel_idx = 0u; in_channel_idx < numInChannel; in_channel_idx++) {
-
-        uint r2, c2;
-
-        for (r2 = 0u; r2 < kernelH; r2++) {
-
-            uint r3 = r1 + r2 - 1u;
-            if(0u <= r3 && r3 < numRows){
-                uint r2_kernelW = r2 * kernelW;
-
-                for (c2 = 0u; c2 < kernelW; c2++) {
-
-                    uint c3 = c1 + c2 - 1u;
-
-                    if(0u <= c3 && c3 < numCols){
-
-                        vec4 txl = texelFetch(x    , ivec3(c3, r3, in_channel_idx), 0);
-
-                        vec4  w = texelFetch(weight, ivec3(r2_kernelW + c2, in_channel_idx, out_channel_idx), 0);
-
-                        sum += txl.r * w.r;
-                    }
-                }
-            }
-        }
-    }
-
-    y = sum + zero;
-}`;
-*/
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-let ConvolutionalLayer = `
-precision highp sampler3D;
-
-uniform sampler3D weight;
-uniform sampler3D x;
-uniform int in_channel_base;
-
-in  float zero;
-out float y;
-
-void main() {
-    int idx = int(gl_VertexID);
-
-    // int out_channel_idx = idx / (numRows * numCols);
-    int out_channel_idx = idx >> shiftRowsCols;
-    idx -= out_channel_idx * (numRows * numCols);
-
-    // int r1 = idx / numCols;
-    int r1 = idx >> shiftCols;
-    int c1 = idx - r1 * numCols;
-
-    float sum = 0.0f;
-    for(int in_channel_offset = 0; in_channel_offset < numInChannel; in_channel_offset++) {
-        int in_channel_idx = in_channel_base + in_channel_offset;
-
-        vec4 ww[3];
-        for (int r2 = 0; r2 < kernelH; r2++){
-            ww[r2]  = texelFetch(weight, ivec3(r2, in_channel_idx, out_channel_idx), 0);
-        }
-    
-        for (int r2 = 0; r2 < kernelH; r2++) {
-            int r3 = r1 + r2 - 1;
-
-            vec4 w = ww[r2];
-            // float w[3];
-            // w[0] = ww[r2].r;
-            // w[1] = ww[r2].g;
-            // w[2] = ww[r2].b;
-
-            for (int c2 = 0; c2 < kernelW; c2++) {
-
-                int c3 = c1 + c2 - 1;
-
-                if(0 <= c3 && c3 < numCols && 0 <= r3 && r3 < numRows){
-
-                    vec4 txl = texelFetch(x    , ivec3(c3, r3, in_channel_idx), 0);
-
-                    // vec4  w = texelFetch(weight, ivec3(r2 * kernelW + c2, in_channel_idx, out_channel_idx), 0);
-
-                    // sum += txl.r * w.r;
-                    // sum += txl.r * ww[r2][c2];
-                    sum += txl.r * w[c2];
-                }
-            }
-        }
-    }
-
-    y = sum + zero;
-}`;
-
-
-let ConvolutionalLayer1x1 = `
-precision highp sampler3D;
-
-uniform sampler2D weight;
-uniform sampler3D x;
-uniform int in_channel_base;
-
-in  float zero;
-out float y;
-
-void main() {
-    int idx = int(gl_VertexID);
-
-    int out_channel_idx = idx / (numRows * numCols);
-    idx -= out_channel_idx * (numRows * numCols);
-
-    int r1 = idx / numCols;
-    int c1 = idx - r1 * numCols;
-
-    float sum = 0.0f;
-    for(int in_channel_offset = 0; in_channel_offset < numInChannel; in_channel_offset++) {
-        int in_channel_idx = in_channel_base + in_channel_offset;
-    
-        vec4 txl = texelFetch(x    , ivec3(c1, r1, in_channel_idx), 0);
-
-        vec4  w = texelFetch(weight, ivec2(in_channel_idx, out_channel_idx), 0);
-
-        sum += txl.r * w.r;
-    }
-
-    y = sum + zero;
-}`;
-
-
-let Conv2dGroup = `
-precision highp sampler3D;
-
-uniform sampler3D weight;
-uniform sampler3D x;
-
-in  float zero;
-out float y;
-
-void main() {
-    uint idx = uint(gl_VertexID);
-
-    uint channel_idx = idx / (numOutRows * numOutCols);
-    idx -= channel_idx * (numOutRows * numOutCols);
-
-    uint r1 = idx / numOutCols;
-    uint c1 = idx - r1 * numOutCols;
-
-    float sum = 0.0f;
-
-    uint r2, c2;
-
-    for (r2 = 0u; r2 < kernelH; r2++) {
-
-        for (c2 = 0u; c2 < kernelW; c2++) {
-
-            // uint c3 = c1 + c2 - (kernelW - 1u);
-            // uint r3 = r1 + r2 - (kernelH - 1u);
-            uint c3 = c1 + c2 - 1u;
-            uint r3 = r1 + r2 - 1u;
-
-            if(0u <= c3 && c3 < numInCols && 0u <= r3 && r3 < numInRows){
-
-                vec4 txl = texelFetch(x    , ivec3(c3, r3, channel_idx), 0);
-
-                vec4  w = texelFetch(weight, ivec3(kernelW - 1u - c2, kernelH - 1u - r2, channel_idx), 0);
-                // vec4  w = texelFetch(weight, ivec3(c2, r2, channel_idx), 0);
-
-                sum += txl.r * w.r;
-            }
-        }
-    }
-
-    y = sum + zero;
-}`;
-
-
-let ConvTranspose2dShader = `
-precision highp sampler3D;
-
-uniform sampler3D weight;
-uniform sampler3D x;
-uniform int in_channel_base;
-
-in  float zero;
-out float y;
-
-void main() {
-    int idx = int(gl_VertexID);
-
-    int num_in_rows_ex = 2 * numInRows - 1;
-    int num_in_cols_ex = 2 * numInCols - 1;
-
-    int out_channel_idx = idx / (numOutRows * numOutCols);
-    idx -= out_channel_idx * (numOutRows * numOutCols);
-
-    int r1 = idx / numOutCols;
-    int c1 = idx - r1 * numOutCols;
-
-    float sum = 0.0f;
-    for(int in_channel_offset = 0; in_channel_offset < numInChannel; in_channel_offset++) {
-        int in_channel_idx = in_channel_base + in_channel_offset;
-    
-        for (int r2 = 0; r2 < kernelH; r2++) {
-
-            for (int c2 = 0; c2 < kernelW; c2++) {
-
-                int c3 = c1 + c2 - (kernelW - 1);
-                int r3 = r1 + r2 - (kernelH - 1);
-
-                if(0 <= c3 && c3 < num_in_cols_ex && 0 <= r3 && r3 < num_in_rows_ex && c3 % 2 == 0 && r3 % 2 == 0){
-                    c3 /= 2;
-                    r3 /= 2;
-
-                    vec4 txl = texelFetch(x    , ivec3(c3, r3, in_channel_idx), 0);
-
-                    vec4  w = texelFetch(weight, ivec3((kernelH - 1 - r2) * kernelW + (kernelW - 1 - c2), in_channel_idx, out_channel_idx), 0);
-                    // vec4  w = texelFetch(weight, ivec3(r2 * kernelW + c2, out_channel_idx, in_channel_idx), 0);
-                    // vec4  w = texelFetch(weight, ivec3( (kernelW - 1 - c2) * kernelH + (kernelH - 1 - r2), out_channel_idx, in_channel_idx), 0);
-
-                    sum += txl.r * w.r;
-                }
-            }
-        }
-    }
-
-    y = sum + zero;
-}`;
 
 let modelObj: any;
 let generator: ImageGenerator;
@@ -1782,44 +1701,3 @@ function makeModuleTable(){
     }
 }
 
-let ConvolutionalLayerOLD = `
-precision highp sampler3D;
-
-uniform sampler3D weight;
-uniform sampler3D x;
-
-in  float zero;
-out float y;
-
-void main() {
-    uint idx = uint(gl_VertexID);
-
-    uint out_channel_idx = idx / (numRows * numCols);
-    idx -= out_channel_idx * (numRows * numCols);
-
-    uint r1 = idx / numCols;
-    uint c1 = idx - r1 * numCols;
-
-    float sum = 0.0f;
-    for(uint in_channel_idx = 0u; in_channel_idx < numInChannel; in_channel_idx++) {
-
-        for (uint r2 = 0u; r2 < kernelH; r2++) {
-
-            for (uint c2 = 0u; c2 < kernelW; c2++) {
-
-                uint c3 = c1 + c2 - 1u;
-                uint r3 = r1 + r2 - 1u;
-
-                if(0u <= c3 && c3 < numCols && 0u <= r3 && r3 < numRows){
-
-                    vec4 txl = texelFetch(x    , ivec3(c3, r3, in_channel_idx), 0);
-                    vec4  w = texelFetch(weight, ivec3(r2 * kernelW + c2, in_channel_idx, out_channel_idx), 0);
-
-                    sum += txl.r * w.r;
-                }
-            }
-        }
-    }
-
-    y = sum + zero;
-}`;
