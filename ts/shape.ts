@@ -1,5 +1,4 @@
-﻿import {TextureInfo, Mesh, Drawable, range, Package, GPGPU} from "./gpgpu.js"
-import { ComponentDrawable, Vertex, Color } from "./gpgpu.js";
+﻿namespace gpgputs {
 
 export class Box {
     x1: number;
@@ -929,4 +928,6 @@ export class ImageDrawable extends Drawable {
 
         return this.package;
     }
+}
+
 }

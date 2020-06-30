@@ -1,5 +1,4 @@
-import {Drawable, range, GPGPU, TextureInfo, Package, CreateGPGPU, Color, Points, Lines, Vertex} from "./gpgpu.js";
-import { makePlaneBuffers, ImageDrawable, Circle, Tube, Pillar, Cone, RegularIcosahedron, GeodesicPolyhedron, Label, Box } from "./shape.js";
+namespace gpgputs {
 
 let mygpgpu;
 
@@ -107,4 +106,6 @@ export function testImageDrawable(){
             imageDrawable,
         ]);
     });
+}
+
 }

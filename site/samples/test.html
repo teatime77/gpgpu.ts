@@ -5,16 +5,12 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Cache-Control" content="no-cache">
 <script type="text/javascript" src="../lib/glMatrix-0.9.5.min.js"></script>
-<script type="module" src="../js/gpgpu.js" ></script>
-<script type="module" src="../js/shape.js" ></script>
-<script type="module" src="../js/shape-shader.js" ></script>
-<script type="module" src="../js/test.js" ></script>
-<script type="module">
-import {testBodyOnLoad} from "../js/test.js";
-testBodyOnLoad();
-</script>
+<script src="../js/gpgpu.js" ></script>
+<script src="../js/shape.js" ></script>
+<script src="../js/shape-shader.js" ></script>
+<script src="../js/test.js" ></script>
 </head>
-<body >
+<body onload="gpgputs.testBodyOnLoad()">
 <canvas id="webgl-canvas" style="border: none;" width="500" height="500"></canvas>
 <canvas id="canvas-2d" style="border: none;" width="256" height="256"></canvas>
 </body>

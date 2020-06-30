@@ -1,5 +1,4 @@
-// import {CreateNeuralNetworkShaders} from "shader.js";
-import {GPGPU, Package, CreateGPGPU, gl, chk } from "./gpgpu.js";
+namespace gpgputs {
 
 let i_latent = 0;
 
@@ -1645,3 +1644,4 @@ function makeModuleTable(){
     }
 }
 
+}

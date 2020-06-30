@@ -1,5 +1,4 @@
-import { gl, GPGPU, UI3D, Package, TextureInfo, range, chk } from "./gpgpu.js";
-import { Tensor } from "./tensor.js";
+namespace gpgputs {
 
 // let gl : WebGL2RenderingContext;
 
@@ -501,5 +500,7 @@ export function gpuBodyOnLoad(){
         runMul(pkg, A, B);
         pkg.clear();
     }
+
+}
 
 }

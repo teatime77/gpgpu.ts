@@ -5,11 +5,9 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Cache-Control" content="no-cache">
 
-<script type="module" src="../js/gpgpu.js?ver=1" ></script>
+<script src="../js/gpgpu.js?ver=1" ></script>
 
-<script type="module">
-    import {CreateGPGPU, Package} from "../js/gpgpu.js";
-
+<script>
 function MatStr(m, nrow, ncol, row_major_order) {
     var s = "";
 
@@ -81,10 +79,10 @@ function onBodyLoad() {
     var C = new Float32Array(2 * 2);
 
     // GPGPUのオブジェクトを作ります。
-    var gpgpu = CreateGPGPU();
+    var gpgpu = gpgputs.CreateGPGPU();
 
     // 計算のパラメータ
-    var pkg = new Package({
+    var pkg = new gpgputs.Package({
         // idはプログラム内でユニークであれば何でも構いません。
         id: "TexMulMat",
 
@@ -121,10 +119,9 @@ function onBodyLoad() {
 
 }
 
-document.body.onload = onBodyLoad();
 </script>
 </head>
-<body>
+<body onload="onBodyLoad()">
 <h1>テクスチャを使った行列の積</h1>
 </body>
 </html>

@@ -5,11 +5,9 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Cache-Control" content="no-cache">
 
-<script type="module" src="../js/gpgpu.js?ver=1" ></script>
+<script src="../js/gpgpu.js?ver=1" ></script>
 
-<script type="module">
-    import {CreateGPGPU, Package } from "../js/gpgpu.js";
-
+<script>
     function onBodyLoad() {
     // 頂点シェーダのプログラムは文字列で記述します。
     var vertex_shader =
@@ -38,10 +36,10 @@
     var C = new Float32Array(6);
 
     // GPGPUのオブジェクトを作ります。
-    var gpgpu = CreateGPGPU();
+    var gpgpu = gpgputs.CreateGPGPU();
 
     // 計算のパラメータを作ります。
-    var pkg = new Package({
+    var pkg = new gpgputs.Package({
         // idはプログラム内でユニークであれば何でも構いません。
         id: "AddVec",
 
@@ -73,10 +71,9 @@
     3000);
 }
 
-document.body.onload = onBodyLoad();
 </script>
 </head>
-<body>
+<body onload="onBodyLoad()">
     <h1>配列の加算</h1>
 </body>
 </html>

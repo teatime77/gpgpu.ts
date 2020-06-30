@@ -1,4 +1,4 @@
-﻿import { VertexShader, FragmentShader } from "./shape-shader.js";
+﻿namespace gpgputs {
 
 declare let mat4:any;
 declare let mat3:any;
@@ -1454,4 +1454,6 @@ export class GPGPU {
 */
 export function CreateGPGPU(canvas: HTMLCanvasElement = undefined, ui3d: UI3D=new UI3D()) {
     return new GPGPU(canvas, ui3d);
+}
+
 }

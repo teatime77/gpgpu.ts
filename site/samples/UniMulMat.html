@@ -5,12 +5,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Cache-Control" content="no-cache">
 
-<script type="module" src="../js/gpgpu.js?ver=1" ></script>
+<script src="../js/gpgpu.js?ver=1" ></script>
 
-<script type="module">
-    import {CreateGPGPU, Package} from "../js/gpgpu.js";
-    
-    function MatStr(m, nrow, ncol, row_major_order) {
+<script>
+function MatStr(m, nrow, ncol, row_major_order) {
         var s = "";
 
         for (var row = 0; row < nrow; row++) {
@@ -57,7 +55,7 @@
     var C = new Float32Array(6);
 
     // 計算のパラメータ
-    var pkg = new Package({
+    var pkg = new gpgputs.Package({
         // idはプログラム内でユニークであれば何でも構いません。
         id: "UniMulMat",
 
@@ -73,7 +71,7 @@
     });
 
     // GPGPUのオブジェクトを作ります。
-    var gpgpu = CreateGPGPU();
+    var gpgpu = gpgputs.CreateGPGPU();
 
     // パラメータを使い計算します。
     gpgpu.compute(pkg);
@@ -92,10 +90,9 @@
     3000);
 }
 
-document.body.onload = onBodyLoad();
 </script>
 </head>
-<body>
+<body onload="onBodyLoad()">
     <h1>行列とベクトルの乗算</h1>
 </body>
 </html>

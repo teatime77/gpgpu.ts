@@ -5,12 +5,10 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Cache-Control" content="no-cache">
 
-<script type="module" src="../js/gpgpu.js?ver=1" ></script>
+<script src="../js/gpgpu.js?ver=1" ></script>
 
-<script type="module">
-    import {CreateGPGPU, Package} from "../js/gpgpu.js";
-
-    function onBodyLoad() {
+<script>
+function onBodyLoad() {
 // 頂点シェーダのプログラムは文字列で記述します。
 var vertex_shader =
     `// 入力変数A
@@ -45,7 +43,7 @@ var C = new Float32Array(6);
 var D = new Float32Array(2);
 
 // 計算のパラメータ
-var pkg = new Package({
+var pkg = new gpgputs.Package({
     // idはプログラム内でユニークであれば何でも構いません。
     id: "AddDotVec",
 
@@ -62,7 +60,7 @@ var pkg = new Package({
 });
 
 // GPGPUのオブジェクトを作ります。
-var gpgpu = CreateGPGPU();
+var gpgpu = gpgputs.CreateGPGPU();
 
 // パラメータを使い計算します。
 gpgpu.compute(pkg);
@@ -83,12 +81,9 @@ setTimeout(()=>{
 
 }
 
-
-document.body.onload = onBodyLoad();
-
 </script>
 </head>
-<body>
+<body onload="onBodyLoad()">
     <h1>ベクトルの加算と内積</h1>
 </body>
 </html>
