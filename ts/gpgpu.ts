@@ -1218,7 +1218,7 @@ export class GPGPU {
 
         gl.useProgram(pkg.program); chk();
 
-        // テクスチャの値のセットする。
+        // テクスチャの値をセットする。
         this.setTextureData(pkg);
 
         // ユニフォーム変数の値をセットする。

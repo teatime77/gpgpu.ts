@@ -30,12 +30,6 @@ function last<T>(v: T[]){
     return v[v.length - 1];
 }
 
-function copyArray(src:Float32Array, dst: Float32Array, src_start:number, src_count, dst_start: number){
-    for(let i = 0; i < src_count; i++){
-        dst[dst_start + i] = src[src_start + i];
-    }
-}
-
 export class Tensor {
     data: Float32Array;
     shape: number[];
@@ -1308,36 +1302,6 @@ function luminosity(f: number){
     return (Math.max(-1, Math.min(f, 1)) + 1) / 2 * 255;
 }
 
-function putImageAAA(t: Tensor){
-    let [N, C, H, W] = t.shape;
-
-    var data = new Uint8Array( 4 * H * W );
-
-    let idx = 0;
-    let r_base = 0;
-    let g_base = H * W;
-    let b_base = 2 * H * W;
-    for(let y = 0; y < H; y++){
-        for(let x = 0; x < W; x ++){
-            let dst = idx * 4;
-
-            data[dst    ] = luminosity(t.data[r_base + idx]); // red
-            data[dst + 1] = luminosity(t.data[g_base + idx]); // green
-            data[dst + 2] = luminosity(t.data[b_base + idx]); // blue                
-            data[dst + 3] = 255;
-
-            idx++;
-        }    
-    }
-
-    let blob = new Blob( [ data ], { type: "image/jpeg" } );
-
-    let img = document.getElementById("gen-img") as HTMLImageElement;
-    img.src = URL.createObjectURL(blob);
-    img.onload = ()=>{
-      URL.revokeObjectURL(img.src);
-    }
-}
 
 function putImage(t: Tensor){
     let canvas = document.getElementById('canvas-2d') as HTMLCanvasElement;
@@ -1412,12 +1376,7 @@ function main(generator: ImageGenerator, latents: Tensor){
                 link.setAttribute('href', canvas.toDataURL("image/png").replace("image/png", "image/octet-stream"));
                 link.click();
                 img_idx++;
-
-                // let image = canvas.toDataURL("image/png"); //.replace("image/png", "image/octet-stream");  // here is the most important part because if you dont replace you will get a DOM 18 exception.
-                // window.location.href=image; // it will save locally    
             }
-
-
 
             clearModuleTable();
 
@@ -1620,31 +1579,31 @@ function makeModuleTable(){
         [ "mapping.25", "mapping.26", "mapping.27", "mapping.28" ], 
         [ "mapping.29", "mapping.30", "mapping.31", "mapping.32" ], 
         [ "mapping.33" ], 
-        [ "blocks.0.0.fc", "blocks.0.0.bias", "blocks.0.0", "blocks.0.1", "blocks.0.2", "blocks.0.3", "blocks.0.4", "toRGBs.0.0.fc", "toRGBs.0.0.bias", "toRGBs.0.0", "toRGBs.0.1" ], 
+        [ "blocks.0.0.fc", "blocks.0.0.bias", "blocks.0.0", "blocks.0.1", "blocks.0.2", "blocks.0.3", "blocks.0.4", "", "toRGBs.0.0.fc", "toRGBs.0.0.bias", "toRGBs.0.0", "toRGBs.0.1" ], 
 
         [ "blocks.1.0.fc", "blocks.1.0.bias", "blocks.1.0", "blocks.1.1", "blocks.1.2", "blocks.1.3", "blocks.1.4", "blocks.1.5" ], 
-        [ "blocks.2.0.fc", "blocks.2.0.bias", "blocks.2.0", "blocks.2.1", "blocks.2.2", "blocks.2.3", "blocks.2.4", "toRGBs.1.0.fc", "toRGBs.1.0.bias", "toRGBs.1.0", "toRGBs.1.1" ], 
+        [ "blocks.2.0.fc", "blocks.2.0.bias", "blocks.2.0", "blocks.2.1", "blocks.2.2", "blocks.2.3", "blocks.2.4", "", "toRGBs.1.0.fc", "toRGBs.1.0.bias", "toRGBs.1.0", "toRGBs.1.1" ], 
 
         [ "blocks.3.0.fc", "blocks.3.0.bias", "blocks.3.0", "blocks.3.1", "blocks.3.2", "blocks.3.3", "blocks.3.4", "blocks.3.5" ], 
-        [ "blocks.4.0.fc", "blocks.4.0.bias", "blocks.4.0", "blocks.4.1", "blocks.4.2", "blocks.4.3", "blocks.4.4", "toRGBs.2.0.fc", "toRGBs.2.0.bias", "toRGBs.2.0", "toRGBs.2.1" ], 
+        [ "blocks.4.0.fc", "blocks.4.0.bias", "blocks.4.0", "blocks.4.1", "blocks.4.2", "blocks.4.3", "blocks.4.4", "", "toRGBs.2.0.fc", "toRGBs.2.0.bias", "toRGBs.2.0", "toRGBs.2.1" ], 
 
         [ "blocks.5.0.fc", "blocks.5.0.bias", "blocks.5.0", "blocks.5.1", "blocks.5.2", "blocks.5.3", "blocks.5.4", "blocks.5.5" ], 
-        [ "blocks.6.0.fc", "blocks.6.0.bias", "blocks.6.0", "blocks.6.1", "blocks.6.2", "blocks.6.3", "blocks.6.4", "toRGBs.3.0.fc", "toRGBs.3.0.bias", "toRGBs.3.0", "toRGBs.3.1" ], 
+        [ "blocks.6.0.fc", "blocks.6.0.bias", "blocks.6.0", "blocks.6.1", "blocks.6.2", "blocks.6.3", "blocks.6.4", "", "toRGBs.3.0.fc", "toRGBs.3.0.bias", "toRGBs.3.0", "toRGBs.3.1" ], 
 
         [ "blocks.7.0.fc", "blocks.7.0.bias", "blocks.7.0", "blocks.7.1", "blocks.7.2", "blocks.7.3", "blocks.7.4", "blocks.7.5" ], 
-        [ "blocks.8.0.fc", "blocks.8.0.bias", "blocks.8.0", "blocks.8.1", "blocks.8.2", "blocks.8.3", "blocks.8.4", "toRGBs.4.0.fc", "toRGBs.4.0.bias", "toRGBs.4.0", "toRGBs.4.1" ], 
+        [ "blocks.8.0.fc", "blocks.8.0.bias", "blocks.8.0", "blocks.8.1", "blocks.8.2", "blocks.8.3", "blocks.8.4", "", "toRGBs.4.0.fc", "toRGBs.4.0.bias", "toRGBs.4.0", "toRGBs.4.1" ], 
 
         [ "blocks.9.0.fc", "blocks.9.0.bias", "blocks.9.0", "blocks.9.1", "blocks.9.2", "blocks.9.3", "blocks.9.4", "blocks.9.5" ], 
-        [ "blocks.10.0.fc", "blocks.10.0.bias", "blocks.10.0", "blocks.10.1", "blocks.10.2", "blocks.10.3", "blocks.10.4", "toRGBs.5.0.fc", "toRGBs.5.0.bias", "toRGBs.5.0", "toRGBs.5.1" ], 
+        [ "blocks.10.0.fc", "blocks.10.0.bias", "blocks.10.0", "blocks.10.1", "blocks.10.2", "blocks.10.3", "blocks.10.4", "", "toRGBs.5.0.fc", "toRGBs.5.0.bias", "toRGBs.5.0", "toRGBs.5.1" ], 
 
         [ "blocks.11.0.fc", "blocks.11.0.bias", "blocks.11.0", "blocks.11.1", "blocks.11.2", "blocks.11.3", "blocks.11.4", "blocks.11.5" ], 
-        [ "blocks.12.0.fc", "blocks.12.0.bias", "blocks.12.0", "blocks.12.1", "blocks.12.2", "blocks.12.3", "blocks.12.4", "toRGBs.6.0.fc", "toRGBs.6.0.bias", "toRGBs.6.0", "toRGBs.6.1" ], 
+        [ "blocks.12.0.fc", "blocks.12.0.bias", "blocks.12.0", "blocks.12.1", "blocks.12.2", "blocks.12.3", "blocks.12.4", "", "toRGBs.6.0.fc", "toRGBs.6.0.bias", "toRGBs.6.0", "toRGBs.6.1" ], 
 
         [ "blocks.13.0.fc", "blocks.13.0.bias", "blocks.13.0", "blocks.13.1", "blocks.13.2", "blocks.13.3", "blocks.13.4", "blocks.13.5" ], 
-        [ "blocks.14.0.fc", "blocks.14.0.bias", "blocks.14.0", "blocks.14.1", "blocks.14.2", "blocks.14.3", "blocks.14.4", "toRGBs.7.0.fc", "toRGBs.7.0.bias", "toRGBs.7.0", "toRGBs.7.1" ], 
+        [ "blocks.14.0.fc", "blocks.14.0.bias", "blocks.14.0", "blocks.14.1", "blocks.14.2", "blocks.14.3", "blocks.14.4", "", "toRGBs.7.0.fc", "toRGBs.7.0.bias", "toRGBs.7.0", "toRGBs.7.1" ], 
 
         [ "blocks.15.0.fc", "blocks.15.0.bias", "blocks.15.0", "blocks.15.1", "blocks.15.2", "blocks.15.3", "blocks.15.4", "blocks.15.5" ], 
-        [ "blocks.16.0.fc", "blocks.16.0.bias", "blocks.16.0", "blocks.16.1", "blocks.16.2", "blocks.16.3", "blocks.16.4", "toRGBs.8.0.fc", "toRGBs.8.0.bias", "toRGBs.8.0", "toRGBs.8.1" ]
+        [ "blocks.16.0.fc", "blocks.16.0.bias", "blocks.16.0", "blocks.16.1", "blocks.16.2", "blocks.16.3", "blocks.16.4", "", "toRGBs.8.0.fc", "toRGBs.8.0.bias", "toRGBs.8.0", "toRGBs.8.1" ]
     ];
 
     let tbl = document.getElementById("module-tbl") as HTMLTableElement;
@@ -1653,6 +1612,11 @@ function makeModuleTable(){
         // let tr = document.createElement("tr");
         let tr = tbl.insertRow(-1);
         for(let [i, name] of row.entries()){
+            if(name == ""){
+                tr.insertCell();
+                continue;
+            }
+
             let mod = allModules[name];
 
             if(i == 0 && name.startsWith("blocks.")){
