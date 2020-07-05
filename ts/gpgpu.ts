@@ -155,7 +155,7 @@ export class Points extends Drawable {
         this.package = {
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: VertexShader.points,
-            fragmentShader: FragmentShader.points,
+            fragmentShader: GPGPU.pointFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(range(points.length / 3))
         } as any as Package;
@@ -209,7 +209,7 @@ export class Lines extends Drawable {
         this.package = {
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: VertexShader.lines,
-            fragmentShader: FragmentShader.points,
+            fragmentShader: GPGPU.pointFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(range(vertices.length))
         } as any as Package;
@@ -222,19 +222,23 @@ export class ComponentDrawable extends Drawable {
 
 export class UserDef extends Drawable {
     numVertex: number;
+    mode: GLenum;
 
-    constructor(vertexShader: string, fragmentShader: string,  numVertex: number){
+    constructor(mode: GLenum, vertexShader: string, fragmentShader: string,  numVertex: number, args: any = {}){
         super();
 
+        this.mode = mode;
         this.numVertex = numVertex;
+
+        let mesh = args as Mesh;
+
+        mesh.vertexPosition = new Float32Array(numVertex);
 
         this.package = {
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: vertexShader,
             fragmentShader: fragmentShader,
-            args: {
-                vertexPosition: new Float32Array(numVertex),
-            }
+            args: mesh
         } as any as Package;
     }
 }
@@ -583,6 +587,15 @@ export class GPGPU {
 
         void main(void) {
             color = vec4(fragmentColor.rgb * vLightWeighting, fragmentColor.a);
+        }
+        `;
+
+    static readonly pointFragmentShader = `
+        in  vec4 fragmentColor;
+        out vec4 color;
+
+        void main(void) {
+            color = fragmentColor;
         }
         `;
 
@@ -1246,7 +1259,7 @@ export class GPGPU {
 
             gl.bufferData(gl.ARRAY_BUFFER, pkg.args.vertexPosition as Float32Array, gl.STATIC_DRAW);
 
-            gl.drawArrays(gl.TRIANGLES, 0, drawable.numVertex);
+            gl.drawArrays(drawable.mode, 0, drawable.numVertex);
             gl.finish();
         }
         else if (pkg.varyings.length == 0) {
@@ -1390,7 +1403,7 @@ export class GPGPU {
         mat4.rotate(viewMat, this.drawParam.yRot, [0, 1, 0]);
 
         let projMat = mat4.create();
-        mat4.perspective(45, this.canvas.width / this.canvas.height, 0.1, 100.0, projMat);
+        mat4.perspective(45, this.canvas.offsetWidth / this.canvas.offsetHeight, 0.1, 100.0, projMat);
 
         for(let drawable of this.drawables){
 
