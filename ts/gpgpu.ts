@@ -218,7 +218,25 @@ export class Lines extends Drawable {
 
 export class ComponentDrawable extends Drawable {
     children: Drawable[];
+}
 
+export class UserDef extends Drawable {
+    numVertex: number;
+
+    constructor(vertexShader: string, fragmentShader: string,  numVertex: number){
+        super();
+
+        this.numVertex = numVertex;
+
+        this.package = {
+            id: `${this.constructor.name}.${Drawable.count++}`,
+            vertexShader: vertexShader,
+            fragmentShader: fragmentShader,
+            args: {
+                vertexPosition: new Float32Array(numVertex),
+            }
+        } as any as Package;
+    }
 }
 
 export class Package{
@@ -1224,10 +1242,15 @@ export class GPGPU {
         // ユニフォーム変数の値をセットする。
         this.setUniformsData(pkg);
 
-        if (pkg.varyings.length == 0) {
-            //  描画する場合
+        if(drawable instanceof UserDef){
 
-            gl.viewport(0, 0, this.canvas.width, this.canvas.height); chk();
+            gl.bufferData(gl.ARRAY_BUFFER, pkg.args.vertexPosition as Float32Array, gl.STATIC_DRAW);
+
+            gl.drawArrays(gl.TRIANGLES, 0, drawable.numVertex);
+            gl.finish();
+        }
+        else if (pkg.varyings.length == 0) {
+            //  描画する場合
 
             // 頂点インデックスバッファをバインドする。
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf); chk();
@@ -1346,6 +1369,15 @@ export class GPGPU {
         3D表示をします。
     */
     drawScene() {
+        gl.clearColor(1, 248/255, 220/255, 1); chk();   // cornsilk
+        gl.clearDepth(1.0); chk();                      // Clear everything
+        
+        gl.enable(gl.DEPTH_TEST); chk();                // Enable depth testing
+        gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
+
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);        
+
         // カラーバッファと深度バッファをクリアする。
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); chk();
 
