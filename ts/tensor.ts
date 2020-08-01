@@ -272,9 +272,9 @@ class Module {
     name: string;
     type: string;
     obj : any;
-    gpuShape: string = undefined;
-    gpuTime: number = undefined;
-    nCalc: number = undefined;
+    gpuShape: string | undefined = undefined;
+    gpuTime: number | undefined = undefined;
+    nCalc: number | undefined = undefined;
 
     constructor(obj:any){        
         this.name = obj['name'];
@@ -1219,17 +1219,17 @@ class ModuleListSequential extends Module {
 
             if(m.gpuTime != undefined){
                 gpuTimeAll += m.gpuTime;
-                nCalcAll   += m.nCalc;
+                nCalcAll   += m.nCalc!;
             }
 
             let sec = (Date.now() - startTime) / 1000;
-            if(m instanceof ConvTranspose2d && 37000000 < m.nCalc){
+            if(m instanceof ConvTranspose2d && 37000000 < m.nCalc!){
 
                 let py_time = (m.obj['time'] == undefined ? "" :  m.obj['time'].toFixed(3));
                 let gpu_shape = (m.gpuShape == undefined ? "" : m.gpuShape);
                 let gpu_time = "";
                 if(m.gpuTime != undefined){
-                    gpu_time = `${py_time}|${(m.gpuTime / 1000).toFixed(3)}秒 ${(m.nCalc / (10000*10000)).toFixed(3)}億回 ${((m.nCalc / m.gpuTime) / (1000 * 1000)).toFixed(3)}GFLOPS`;
+                    gpu_time = `${py_time}|${(m.gpuTime / 1000).toFixed(3)}秒 ${(m.nCalc! / (10000*10000)).toFixed(3)}億回 ${((m.nCalc! / m.gpuTime) / (1000 * 1000)).toFixed(3)}GFLOPS`;
                 }
 
                 let diff = (use_random || i_latent != 0 || m.obj['y'] == undefined ? "" : `diff:${m.diff(y!)}`);

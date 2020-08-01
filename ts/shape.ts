@@ -774,8 +774,6 @@ export class Pillar extends ComponentDrawable {
             (new Circle(colors[1], numDivision)).move(0, 0, 1),
             (new Circle(colors[2], numDivision)).move(0, 0, -1),
         ];
-
-        this.package = null;
     }
 }
 

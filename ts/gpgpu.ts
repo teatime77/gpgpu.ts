@@ -4,6 +4,7 @@ declare let mat4:any;
 declare let mat3:any;
 
 type TextureValue = Float32Array | HTMLImageElement | HTMLCanvasElement;
+export type Mesh = any;
 
 export let gl : WebGL2RenderingContext;
 
@@ -262,18 +263,18 @@ export class UserPoints extends UserDef {
 }
 
 export class Package{
-    id: string;
-    vertexShader: string;
-    fragmentShader: string;
-    args: { [name: string]: Float32Array|TextureInfo } | Mesh;
-    VertexIndexBuffer: Uint16Array | Uint32Array;
+    id!: string;
+    vertexShader!: string;
+    fragmentShader: string = GPGPU.minFragmentShader;
+    args: Mesh;
+    VertexIndexBuffer: Uint16Array | Uint32Array | undefined;
 
     program: WebGLProgram | undefined;
     transformFeedback: WebGLTransformFeedback | undefined;
 
     vertexIndexBufferInf: WebGLBuffer | undefined;
     textures: TextureInfo[] = [];
-    attribElementCount: number;
+    attribElementCount: number | undefined;
     varyings: ArgInf[] = [];
     attributes: ArgInf[] = [];
     uniforms: ArgInf[] = [];
@@ -323,7 +324,7 @@ export class Package{
         this.textures.forEach(x => gl.deleteTexture(x.Texture!), chk())
 
         // プログラムを削除する。
-        gl.deleteProgram(this.program); chk();
+        gl.deleteProgram(this.program!); chk();
     }
 }
 
@@ -336,7 +337,7 @@ export class TextureInfo {
     dirty: boolean = true;
     name: string | undefined;
     isArray: boolean | undefined;
-    texelType: string;
+    texelType: string | null;
     samplerType: string | undefined;
     shape: number[] | null;
     value: TextureValue;
@@ -347,7 +348,9 @@ export class TextureInfo {
     /*
         TextureInfoのコンストラクタ
     */
-    constructor(texel_type: string, shape: number[] | null, value: TextureValue) {
+    constructor(texel_type: string | null, shape: number[] | null, value: TextureValue) {
+        console.assert(texel_type != null || !(value instanceof Float32Array));
+
         // テクセルの型
         this.texelType = texel_type;
 
@@ -377,15 +380,6 @@ class ArgInf {
         this.isArray = is_array;
 
     }
-}
-
-export class Mesh {
-    vertexPosition: Float32Array;
-    vertexNormal: Float32Array;
-    vertexColor : Float32Array;
-    textureCoord: Float32Array;
-    textureImage: TextureInfo;
-    pointSize : number;
 }
 
 export class DrawParam{
@@ -646,10 +640,9 @@ export class GPGPU {
     canvas: HTMLCanvasElement;
     TEXTUREs: number[];
     packages: Package[] = [];
-    drawables: Drawable[];
-    drawParam: DrawParam;
+    drawables: Drawable[] = [];
+    drawParam: DrawParam = new DrawParam(0, 0, 0, 0, -5.0);;
     ui3D : UI3D;
-    pending: boolean;
 
     /*
         GPGPUのコンストラクタ
@@ -689,8 +682,7 @@ export class GPGPU {
 
         const ext = gl.getExtension("EXT_color_buffer_float");
         if (!ext) {
-            alert("need EXT_color_buffer_float");
-            return;
+            throw new Error("need EXT_color_buffer_float");
         }
 
         // 標準のシェーダの文字列をセットする。
@@ -829,7 +821,7 @@ export class GPGPU {
                     // テクスチャのsamplerでない場合
 
                     // 変数の名前、値、型、配列かどうかをセットする。
-                    var arg_inf = new ArgInf(arg_name, arg_val, tkn1, is_array );
+                    var arg_inf = new ArgInf(arg_name, arg_val as (Float32Array | number), tkn1, is_array );
 
                     switch (tokens[0]) {
                         case "in":
@@ -1080,7 +1072,7 @@ export class GPGPU {
         pkg.vertexIndexBufferInf = gl.createBuffer()!; chk();
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf); chk();
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, pkg.VertexIndexBuffer, gl.STATIC_DRAW); chk();
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, pkg.VertexIndexBuffer!, gl.STATIC_DRAW); chk();
     }
 
     /*
@@ -1112,13 +1104,6 @@ export class GPGPU {
         パッケージを作ります。
     */
     makePackage(pkg: Package) {
-        if (!pkg.fragmentShader) {
-            // フラグメントシェーダが指定されてない場合
-
-            // デフォルトのフラグメントシェーダをセットする。
-            pkg.fragmentShader = GPGPU.minFragmentShader;
-        }
-
         // シェーダのソースコードを解析する。
         this.parseShader(pkg);
 
@@ -1148,7 +1133,7 @@ export class GPGPU {
 
             // すべてのvarying変数に対し
             for (let varying of pkg.varyings) {
-                var out_buffer_size = this.vecDim(varying.type) * pkg.attribElementCount * Float32Array.BYTES_PER_ELEMENT;
+                var out_buffer_size = this.vecDim(varying.type) * pkg.attribElementCount! * Float32Array.BYTES_PER_ELEMENT;
 
                 // Transform Feedbackバッファを作る。
                 varying.feedbackBuffer = gl.createBuffer()!; chk();
@@ -1240,7 +1225,7 @@ export class GPGPU {
     copyParamArgsValue(pkg: Package){
         for(let args of[ pkg.attributes, pkg.uniforms, pkg.textures, pkg.varyings ]) {
             for (let arg of args) {
-                var val = pkg.args[arg.name];
+                var val = pkg.args[arg.name!];
                 assert(val != undefined);
                 if (args == pkg.textures) {
                     // テクスチャ情報の場合
@@ -1294,6 +1279,9 @@ export class GPGPU {
                 gl.finish();
             }
             else{
+                if(pkg.VertexIndexBuffer == undefined){
+                    throw new Error();
+                }
 
                 // 頂点インデックスバッファをバインドする。
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf!); chk();
@@ -1340,7 +1328,7 @@ export class GPGPU {
             gl.beginTransformFeedback(gl.POINTS); chk();    // TRIANGLES
 
             // 点ごとの描画をする。
-            gl.drawArrays(gl.POINTS, 0, pkg.attribElementCount); chk();
+            gl.drawArrays(gl.POINTS, 0, pkg.attribElementCount!); chk();
 
             // Transform Feedbackを終了する。
             gl.endTransformFeedback(); chk();
@@ -1462,8 +1450,6 @@ export class GPGPU {
 
         // 次の再描画でdrawSceneが呼ばれるようにする。
         window.requestAnimationFrame(this.drawScene.bind(this));
-
-        this.pending = false;
     }
 
     /*
@@ -1471,7 +1457,6 @@ export class GPGPU {
     */
     startDraw3D(drawables: Drawable[]) {
         this.drawables = drawables;
-        this.drawParam = new DrawParam(0, 0, 0, 0, -5.0);
 
         // pointerdownのイベント リスナーを登録する。
         if(this.ui3D.pointerdown != undefined){
