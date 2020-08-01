@@ -33,7 +33,7 @@ export class Tensor {
     data: Float32Array;
     shape: number[];
 
-    constructor(shape: number[], data: Float32Array = undefined){
+    constructor(shape: number[], data: Float32Array | undefined = undefined){
         this.shape = shape;
         if(data == undefined){
             this.data = new Float32Array(this.length());
@@ -46,7 +46,7 @@ export class Tensor {
     }
 
     static fromObj(obj: any) : Tensor{
-        let length = obj['shape'].reduce((a, b)=> a * b, 1);
+        let length = obj['shape'].reduce((a: number, b: number)=> a * b, 1);
         let data  = new Float32Array(tensorAll, 4 * obj['pos'], length);
 
         return new Tensor(obj['shape'], data)
@@ -56,7 +56,7 @@ export class Tensor {
         return this.shape.reduce((a, b)=> a * b, 1);
     }
 
-    view(...shape) : Tensor {
+    view(...shape: number[]) : Tensor {
         return new Tensor(shape, this.data);
     }
 
@@ -64,10 +64,10 @@ export class Tensor {
         return new Tensor(this.shape.slice(), this.data.slice());
     }
 
-    at(...args) : number {
+    at(...args: number[]) : number {
         let scale = 1;
         let idx = 0;
-        let dim_i = zip(this.shape, args as number[]).reverse();
+        let dim_i = zip(this.shape, args).reverse();
         for(let [dim, i] of dim_i ){
             idx   += scale * i;
             scale *= dim;
@@ -76,10 +76,10 @@ export class Tensor {
         return this.data[idx];
     }
 
-    set(val, ...args) : void {
+    set(val: number, ...args: number[]) : void {
         let scale = 1;
         let idx = 0;
-        let dim_i = zip(this.shape, args as number[]).reverse();
+        let dim_i = zip(this.shape, args).reverse();
         for(let [dim, i] of dim_i ){
             idx   += scale * i;
             scale *= dim;
@@ -184,7 +184,7 @@ export class Tensor {
         return [this_idx, dst_idx];
     }
 
-    expand(...shape) : Tensor{
+    expand(...shape: number[]) : Tensor{
         const startTime = Date.now();
         console.assert(this.shape.length == shape.length);
 
@@ -289,7 +289,11 @@ class Module {
         }
     }
 
-    *forward(x: Tensor | [Tensor,Tensor]) {        
+    *forward2(x: [Tensor,Tensor]) : Generator<Tensor | undefined> {        
+        console.assert(false, '未実装');
+    }
+
+    *forward(x: Tensor) : Generator<Tensor | undefined> {  
         console.assert(false, '未実装');
         yield x as Tensor;
     }
@@ -332,8 +336,8 @@ class LeakyReLU extends Module {
         // log(`${this.name} ${this.type} ${this.negative_slope}`)
     }
 
-    *forward(x: Tensor) {
-        running = this;
+    *forward(x: Tensor) : Generator<Tensor | undefined>  {
+        running = this as Module;
         yield;
 
         let dt = new Float32Array(x.data);
@@ -356,7 +360,7 @@ class PixelwiseNormalization extends Module {
     }
 
     * forward(x: Tensor){
-        running = this;
+        running = this as Module;
         yield;
 
         console.assert(x.shape.length == 2 && x.shape[0] == 1);
@@ -386,7 +390,7 @@ class TruncationTrick extends Module {
 
 
     *forward(x: Tensor) {
-        running = this;
+        running = this as Module;
         yield;
 
         let [N, O, D] = this.avg.shape;
@@ -419,7 +423,7 @@ class Amplify extends Module {
     }
 
     *forward(x: Tensor) {
-        running = this;
+        running = this as Module;
         yield;
 
         let dt = new Float32Array(x.data);
@@ -441,7 +445,7 @@ class AddChannelwiseBias extends Module {
     }
 
     *forward(x: Tensor) {
-        running = this;
+        running = this as Module;
         yield;
         const startTime = Date.now();
 
@@ -474,7 +478,7 @@ class EqualizedFullyConnect extends Module {
     }
 
     *forward(x: Tensor) {
-        running = this;
+        running = this as Module;
         yield;
 
         console.assert(x.shape[0] == 1);
@@ -563,7 +567,7 @@ class EqualizedFullyConnect extends Module {
 
 class PixelwiseNoise extends Module {
     const_noise: Tensor;
-    noise: Tensor = null;
+    noise: Tensor | null = null;
     noise_scaler: number;
 
     constructor(obj:any){
@@ -573,7 +577,7 @@ class PixelwiseNoise extends Module {
     }
 
     *forward(x: Tensor) {
-        running = this;
+        running = this as Module;
         yield;
 
         let [N,C,H,W] = x.shape;
@@ -614,7 +618,7 @@ class FusedBlur3x3 extends Module {
     }
 
     *forward(x: Tensor) {
-        running = this;
+        running = this as Module;
         yield;
 
         let sum = 0;
@@ -736,23 +740,23 @@ class ConvTranspose2d extends Module {
         this.groups = obj['groups'];
     }
 
-    *forward(pack: [Tensor, Tensor]){
+    *forward2(pack: [Tensor, Tensor]){
         let [x, style] = pack;
         let [N, iC, H, W] = x.shape;
         let [N2, oC, iC2, kH, kW] = this.weight.shape;
 
         console.assert(N == N2 && iC == iC2);
 
-        let fc_y;
+        let fc_y : Tensor | undefined;
         for(fc_y of this.fc.forward(style)) yield;
 
-        let bias_y;
-        for(bias_y of this.bias.forward(fc_y)) yield;
+        let bias_y : Tensor | undefined;
+        for(bias_y of this.bias.forward(fc_y!)) yield;
 
-        running = this;
+        running = this as Module;
         yield;
 
-        let mod_rates = bias_y.add(1);// (N, iC)
+        let mod_rates = bias_y!.add(1);// (N, iC)
 
         let modulated_weight = this.weight.mul(mod_rates.view(N,1,iC,1,1));
 
@@ -769,11 +773,11 @@ class ConvTranspose2d extends Module {
 
         x = x.view(1, N * iC, H, W);
 
-        let y;
+        let y : Tensor | undefined;
         for(y of this.gpuConvTranspose2d(x, weight.view(N*oC, iC, kH, kW), this.stride, this.padding)) yield;
 
-        let [dim1, dim2, Hp1, Wp1] = y.shape;
-        y = y.view(N, oC, Hp1, Wp1);
+        let [dim1, dim2, Hp1, Wp1] = y!.shape;
+        y = y!.view(N, oC, Hp1, Wp1);
 
         yield y;
     }
@@ -924,7 +928,7 @@ class Conv2d extends Module {
         this.groups = obj['groups'];
     }
 
-    *forward(pack: [Tensor, Tensor]) {
+    *forward2(pack: [Tensor, Tensor]) {
         let startTime = Date.now();
 
         let [x, style] = pack;
@@ -933,16 +937,16 @@ class Conv2d extends Module {
 
         console.assert(N == N2 && iC == iC2);
 
-        let fc_y;
+        let fc_y: Tensor | undefined;
         for(fc_y of this.fc.forward(style)) yield;
 
-        let bias_y;
-        for(bias_y of this.bias.forward(fc_y)) yield;
+        let bias_y : Tensor | undefined;
+        for(bias_y of this.bias.forward(fc_y!)) yield;
 
-        running = this;
+        running = this as Module;
         yield;
 
-        let mod_rates = bias_y.add(1);// (N, iC)
+        let mod_rates = bias_y!.add(1);// (N, iC)
 
         if(1000 < startTime - Date.now()){log(`  A ${this.type} ${(Date.now() - startTime) / 1000}秒`);} startTime = Date.now();
 
@@ -1161,16 +1165,16 @@ class ImageGenerator extends Module {
     }
 
     *genImage(latent: Tensor) {
-        let styles;
+        let styles : Tensor | undefined;
         for(styles of this.mapping.forward(latent)) yield;
 
-        styles = styles.view(...styles.shape.slice(1));
+        styles = styles!.view(...styles!.shape.slice(1));
 
-        let tmp;
-        for(tmp of this.blocks.modules[0].forward( [this.const_input, styles.row(0) ] )) yield;
+        let tmp : Tensor | undefined;
+        for(tmp of this.blocks.modules[0].forward2( [this.const_input, styles.row(0) ] )) yield;
 
-        let skip;
-        for(skip of this.toRGBs.modules[0].forward( [tmp, styles.row(1)] )) yield;
+        let skip : Tensor | undefined;
+        for(skip of this.toRGBs.modules[0].forward2( [tmp!, styles.row(1)] )) yield;
 
         // log(`FW ${this.name} ${this.type} ${styles.shape} skip:${skip.shape_last()}`)
 
@@ -1182,15 +1186,15 @@ class ImageGenerator extends Module {
             let styF  = styles.row(2 + 2 * idx);
             let styT  = styles.row(3 + 2 * idx);
 
-            for(tmp of convU.forward( [tmp,styU] )) yield;
+            for(tmp of convU.forward2( [tmp!,styU] )) yield;
 
-            for(tmp of convF.forward( [tmp,styF] )) yield;
+            for(tmp of convF.forward2( [tmp!,styF] )) yield;
 
-            let rgb;
-            for(rgb of toRGB.forward( [tmp,styT] )) yield;
+            let rgb : Tensor | undefined;
+            for(rgb of toRGB.forward2( [tmp!,styT] )) yield;
 
-            let up_skip = interpolate(skip);
-            skip = rgb.add(up_skip);
+            let up_skip = interpolate(skip!);
+            skip = rgb!.add(up_skip);
             // log(`FW ${this.name} ${this.type} tmp:${tmp.shape_last()}`);
 
             yield skip;
@@ -1208,11 +1212,11 @@ class ModuleListSequential extends Module {
     }
 
     *forward(x: Tensor) {
-        let y = x;
+        let y: Tensor | undefined = x;
         for(let m of this.modules){
             let startTime = Date.now(); // 開始時間
 
-            for(y of m.forward(y)) yield;
+            for(y of m.forward(y!)) yield;
 
             if(m.gpuTime != undefined){
                 gpuTimeAll += m.gpuTime;
@@ -1229,7 +1233,7 @@ class ModuleListSequential extends Module {
                     gpu_time = `${py_time}|${(m.gpuTime / 1000).toFixed(3)}秒 ${(m.nCalc / (10000*10000)).toFixed(3)}億回 ${((m.nCalc / m.gpuTime) / (1000 * 1000)).toFixed(3)}GFLOPS`;
                 }
 
-                let diff = (use_random || i_latent != 0 || m.obj['y'] == undefined ? "" : `diff:${m.diff(y)}`);
+                let diff = (use_random || i_latent != 0 || m.obj['y'] == undefined ? "" : `diff:${m.diff(y!)}`);
                 log(`FW ${m.shortType()} ${gpu_shape} ${gpu_time} ${diff}`);
             }
         }
@@ -1249,7 +1253,7 @@ let generator: ImageGenerator;
 let tensorAll : ArrayBuffer;
 let gpgpu: GPGPU;
 let allModules : { [name: string]: Module }  = {};
-let running : Module = null;
+let running : Module | null = null;
 let use_random = false;
 let nCalcAll = 0;
 let gpuTimeAll = 0;
@@ -1293,7 +1297,7 @@ function parseModel(obj:any) : Module{
         return new LeakyReLU(obj);
 
     default:
-        console.assert(false);
+        throw new Error();
     }
 }
 
@@ -1304,7 +1308,7 @@ function luminosity(f: number){
 
 function putImage(t: Tensor){
     let canvas = document.getElementById('canvas-2d') as HTMLCanvasElement;
-    let ctx = canvas.getContext('2d');
+    let ctx = canvas.getContext('2d')!;
 
     let [N, C, H, W] = t.shape;
 
@@ -1334,7 +1338,7 @@ function putImage(t: Tensor){
 function main(generator: ImageGenerator, latents: Tensor){
     makeModuleTable();
 
-    let prev_running = null;
+    let prev_running : Module | null = null;
     let running_yield = 0;
     nCalcAll = 0;
     gpuTimeAll = 0;
@@ -1362,7 +1366,7 @@ function main(generator: ImageGenerator, latents: Tensor){
 
                 // https://stackoverflow.com/questions/10673122/how-to-save-canvas-as-an-image-with-canvas-todataurl
                 let canvas = document.getElementById('canvas-2d') as HTMLCanvasElement;
-                var link = document.getElementById('download-link');
+                var link = document.getElementById('download-link')!;
                 let dt = new Date();
                 if(use_random){
 
@@ -1408,7 +1412,7 @@ function main(generator: ImageGenerator, latents: Tensor){
                     drawModule(prev_running, "blue");
                 }
                 running_yield = 0;
-                drawModule(running, "white", "red");
+                drawModule(running!, "white", "red");
 
                 prev_running = running;
             }
@@ -1416,16 +1420,16 @@ function main(generator: ImageGenerator, latents: Tensor){
                 running_yield++;
                 if(running_yield % 2 == 0){
 
-                    drawModule(running, "white", "red");
+                    drawModule(running!, "white", "red");
                 }
                 else{
 
-                    drawModule(running, "red", "white");
+                    drawModule(running!, "red", "white");
                 }
             }
 
             if(data.value != undefined){
-                drawModule(prev_running, "blue");
+                drawModule(prev_running!, "blue");
 
                 let skip = data.value as Tensor;
                 putImage(skip);
