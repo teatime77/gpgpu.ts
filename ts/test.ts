@@ -3,14 +3,14 @@ namespace gpgputs {
 let mygpgpu;
 
 class TextDrawable extends Drawable {
-    canvas_2d;
-    box;
+    canvas_2d : HTMLCanvasElement;
+    box : Box;
 
-    constructor(box){
+    constructor(box : Box){
         super();
         this.box = box;
-        this.canvas_2d = document.getElementById("canvas-2d");
-        let ctx = this.canvas_2d.getContext('2d');
+        this.canvas_2d = document.getElementById("canvas-2d") as HTMLCanvasElement;
+        let ctx = this.canvas_2d.getContext('2d')!;
         ctx.font = "16px monospace";
         ctx.textBaseline = "top";
 
@@ -33,24 +33,24 @@ class TextDrawable extends Drawable {
 
             var [mesh, idx_array] = makePlaneBuffers(this.box, 11, 11, new TextureInfo(null, null, this.canvas_2d));
 
-            this.package = {
+            this.package = new Package({
                 id: "label",
                 vertexShader: GPGPU.textureSphereVertexShader,
                 fragmentShader: GPGPU.defaultFragmentShader,
                 args: mesh,
                 VertexIndexBuffer: idx_array
-            } as Package ;
+            });
         }
 
         return this.package;
     }
 }
 
-let imageDrawable;
+let imageDrawable : ImageDrawable;
 let textDrawable;
 let textDrawable2;
-let labelDrawable1;
-let labelDrawable2;
+let labelDrawable1 : Label;
+let labelDrawable2 : Label;
 
 export function testBodyOnLoad(){
     imageDrawable = new ImageDrawable("../img/world.topo.bathy.200408.2048x2048.png", ()=>{

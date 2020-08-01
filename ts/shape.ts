@@ -313,13 +313,13 @@ function divideTriangle(points1: Vertex[], triangles: Triangle[], sphere_r: numb
 
                         var k = edge.Endpoints[i].adjacentVertexes.indexOf(edge.Endpoints[(i + 1) % 2]);
                         console.assert(k != -1);
-                        edge.Endpoints[i].adjacentVertexes[k] = mids.get(edge);
+                        edge.Endpoints[i].adjacentVertexes[k] = mids.get(edge)!;
                     }
 
                     edges.push(edge);
                 }
 
-                var mid = mids.get(edge);
+                var mid = mids.get(edge)!;
 
                 midpoints.push(mid);
 
@@ -556,13 +556,13 @@ export class Circle extends Drawable {
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
-        this.package = {
+        this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as Package;
+        });
     }
 }
 
@@ -599,13 +599,13 @@ export class RegularIcosahedron extends Drawable {
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
-        this.package = {
+        this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as Package;
+        });
     }
 }
 
@@ -645,13 +645,13 @@ export class GeodesicPolyhedron extends Drawable {
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
-        this.package = {
+        this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as Package;
+        });
     }
 }
 
@@ -700,13 +700,13 @@ export class Cone extends ComponentDrawable {
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
-        this.package = {
+        this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as Package;
+        });
 
         this.children = [];
     }
@@ -755,13 +755,13 @@ export class Tube extends Drawable {
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
             
-        this.package = {
+        this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as Package;
+        });
     }
 }
 
@@ -796,7 +796,7 @@ export class Label extends Drawable {
 
         window.document.body.appendChild(Label.canvas);
 
-        Label.ctx = Label.canvas.getContext('2d');
+        Label.ctx = Label.canvas.getContext('2d')!;
         Label.ctx.font = `${Label.fontSize}px monospace`;
         Label.ctx.textBaseline = "top";
 
@@ -887,13 +887,13 @@ export class Label extends Drawable {
         } as Mesh;
         
     
-        this.package = {
+        this.package = new Package({
             id: `label${Drawable.count++}`,
             vertexShader: GPGPU.planeTextureVertexShader,//.textureSphereVertexShader,
             fragmentShader: GPGPU.planeTextureFragmentShader,//defaultFragmentShader,
             args: mesh,
             VertexIndexBuffer: new Uint16Array(vertexIndices)
-        } as any as Package;
+        });
 
     }
 }
@@ -902,7 +902,7 @@ export class Label extends Drawable {
 export class ImageDrawable extends Drawable {
     img: HTMLImageElement;
 
-    constructor(src: string, fnc) {
+    constructor(src: string, fnc: (ev: Event)=>any) {
         super();
         this.img = new Image();
         this.img.onload = fnc;
@@ -914,13 +914,13 @@ export class ImageDrawable extends Drawable {
 
             var [mesh, idx_array] = makePlaneBuffers(new Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new TextureInfo(null, null, this.img));
 
-            this.package = {
+            this.package = new Package({
                 id: "Earth",
                 vertexShader: GPGPU.textureSphereVertexShader,
                 fragmentShader: GPGPU.defaultFragmentShader,
                 args: mesh,
                 VertexIndexBuffer: idx_array
-            } as any as Package;
+            });
         }
 
         return this.package;

@@ -32,13 +32,13 @@ class MyDraw {
 
             var [mesh, idx_array] = gpgputs.makeEarthBuffers(new gpgputs.TextureInfo("vec4", null, this.img));
 
-            this.package = {
+            this.package = new gpgputs.Package({
                 id: "Earth",
                 vertexShader: gpgputs.GPGPU.textureSphereVertexShader,
                 fragmentShader: gpgputs.GPGPU.defaultFragmentShader,
                 args: mesh,
                 VertexIndexBuffer: idx_array
-            };
+            });
         }
 
         return this.package;

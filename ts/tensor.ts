@@ -889,7 +889,6 @@ class ConvTranspose2d extends Module {
         for(let idx = 0; idx * iCmini < iC; idx++){
             pkg.args["in_channel_base"] = idx * iCmini;
 
-
             let startTime = Date.now(); 
             gpgpu.compute(pkg);
             this.gpuTime += Date.now() - startTime;
@@ -1208,7 +1207,7 @@ class ModuleListSequential extends Module {
     constructor(obj:any){
         super(obj);
 
-        this.modules = obj['modules'].map(x => parseModel(x));
+        this.modules = obj['modules'].map((x: any) => parseModel(x));
     }
 
     *forward(x: Tensor) {
