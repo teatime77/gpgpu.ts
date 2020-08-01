@@ -35,12 +35,12 @@ export function chk() {
 }
 
 
-class Vec3 {
+export class Vec3 {
     x: number;
     y: number;
     z: number;
 
-    constructor(x, y, z){
+    constructor(x: number, y: number, z: number){
         this.x = x;
         this.y = y;
         this.z = z;
@@ -63,15 +63,15 @@ class Vec3 {
 }
 
 export class Vertex extends Vec3 {
-    nx: number;
-    ny: number;
-    nz: number;
-    texX: number;
-    texY: number;
+    nx: number = 0;
+    ny: number = 0;
+    nz: number = 0;
+    texX: number = 0;
+    texY: number = 0;
 
     adjacentVertexes: Vertex[];
 
-    constructor(x, y, z) {
+    constructor(x: number, y: number, z: number) {
         super(x, y, z);
         this.adjacentVertexes = [];
     }
@@ -115,7 +115,7 @@ export class Drawable {
     }
 
     getVertexColors(color: Color, numVertex: number) : number[] {
-        let vertexColors = [];
+        let vertexColors: number[] = [];
 
         range(numVertex).forEach(x => {
             vertexColors.push(color.r, color.g, color.b, color.a);
@@ -222,7 +222,7 @@ export class ComponentDrawable extends Drawable {
 
 export class UserDef extends Drawable {
     mode: GLenum;
-    update : (self: UserDef)=>void = undefined;
+    update : ((self: UserDef)=>void) | undefined = undefined;
 
     constructor(mode: GLenum,  vertexShader: string, fragmentShader: string){
         super();
@@ -847,7 +847,7 @@ export class GPGPU {
     */
     makeProgram(vertex_shader: WebGLShader, fragment_shader: WebGLShader, varyings: ArgInf[]) : WebGLProgram {
         // プログラムを作る。
-        var prg = gl.createProgram(); chk();
+        var prg = gl.createProgram()!; chk();
 
         // 頂点シェーダをアタッチする。
         gl.attachShader(prg, vertex_shader); chk();
@@ -890,7 +890,7 @@ export class GPGPU {
         source = "#version 300 es\nprecision highp float;\nprecision highp int;\n" + source;
 
         // シェーダを作る。
-        var shader = gl.createShader(type); chk();
+        var shader = gl.createShader(type)!; chk();
 
         // シェーダにソースをセットする。
         gl.shaderSource(shader, source); chk();
@@ -929,7 +929,7 @@ export class GPGPU {
             }
 
             // バッファを作る。
-            attrib.AttribBuffer = gl.createBuffer();
+            attrib.AttribBuffer = gl.createBuffer()!; chk();
 
             // attribute変数の位置
             attrib.AttribLoc = gl.getAttribLocation(pkg.program, attrib.name); chk();
@@ -951,12 +951,12 @@ export class GPGPU {
             var tex_inf = pkg.textures[i];
 
             // テクスチャのuniform変数の位置
-            tex_inf.locTexture = gl.getUniformLocation(pkg.program, tex_inf.name); chk();
+            tex_inf.locTexture = gl.getUniformLocation(pkg.program, tex_inf.name)!; chk();
 
             var dim = tex_inf.samplerType == "sampler3D" ? gl.TEXTURE_3D : gl.TEXTURE_2D;
 
             // テクスチャを作る。
-            tex_inf.Texture = gl.createTexture(); chk();
+            tex_inf.Texture = gl.createTexture()!; chk();
 
             // 指定した位置のテクスチャをアクティブにする。
             gl.activeTexture(this.TEXTUREs[i]); chk();
@@ -1065,7 +1065,7 @@ export class GPGPU {
         gl.clearColor(0.0, 0.0, 0.0, 1.0); chk();
         gl.enable(gl.DEPTH_TEST); chk();
 
-        pkg.vertexIndexBufferInf = gl.createBuffer(); chk();
+        pkg.vertexIndexBufferInf = gl.createBuffer()!; chk();
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf); chk();
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, pkg.VertexIndexBuffer, gl.STATIC_DRAW); chk();
@@ -1139,7 +1139,7 @@ export class GPGPU {
                 var out_buffer_size = this.vecDim(varying.type) * pkg.attribElementCount * Float32Array.BYTES_PER_ELEMENT;
 
                 // Transform Feedbackバッファを作る。
-                varying.feedbackBuffer = gl.createBuffer(); chk();
+                varying.feedbackBuffer = gl.createBuffer()!; chk();
 
                 // バッファをバインドする。
                 gl.bindBuffer(gl.ARRAY_BUFFER, varying.feedbackBuffer); chk();
@@ -1148,7 +1148,7 @@ export class GPGPU {
             }
 
             // Transform Feedbackを作る。
-            pkg.transformFeedback = gl.createTransformFeedback(); chk();
+            pkg.transformFeedback = gl.createTransformFeedback()!; chk();
         }
 
         if (pkg.VertexIndexBuffer) {

@@ -146,11 +146,11 @@ function sprintf() {
 }
 
 
-function vecLen(p) {
+function vecLen(p: Vec3) {
     return Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
 }
 
-function vecDiff(p, q) {
+function vecDiff(p: Vec3, q: Vec3) {
     var dx = p.x - q.x;
     var dy = p.y - q.y;
     var dz = p.z - q.z;
@@ -158,20 +158,16 @@ function vecDiff(p, q) {
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-function vecSub(a, b) {
-    return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+function vecSub(a: Vec3, b: Vec3) {
+    return new Vec3( a.x - b.x, a.y - b.y, a.z - b.z );
 }
 
-function vecDot(a, b) {
+function vecDot(a: Vec3, b: Vec3) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-function vecCross(a, b) {
-    return {
-        x: a.y * b.z - a.z * b.y,
-        y: a.z * b.x - a.x * b.z,
-        z: a.x * b.y - a.y * b.x
-    };
+function vecCross(a: Vec3, b: Vec3) {
+    return new Vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
 }
 
 function SetNorm(p: Vertex) {
@@ -279,21 +275,22 @@ function makeRegularIcosahedron() : [ Vertex[], Triangle[], number ] {
     return [ points, triangles, sphere_r ];
 }
 
-function divideTriangle(points1, triangles, sphere_r, divideCnt) {
+function divideTriangle(points1: Vertex[], triangles: Triangle[], sphere_r: number, divideCnt: number) : [ Vertex[], Triangle[], Edge[] ] {
     let points2 = Array.from(points1) as Vertex[];
-    let edges = [];
+    let edges : Edge[] = [];
+    let mids = new Map<Edge, Vertex>();
 
     for (var divide_idx = 0; divide_idx < divideCnt; divide_idx++) {
 
         // 三角形を分割する。
-        var new_triangles = [];
+        var new_triangles: Triangle[] = [];
 
         triangles.forEach(function (x) {
             // 三角形の頂点のリスト。
             var pnts = [ x.Vertexes[0], x.Vertexes[1], x.Vertexes[2] ];
 
             // 中点のリスト
-            var midpoints = [];
+            var midpoints : Vertex[] = [];
 
             for (var i1 = 0; i1 < 3; i1++) {
 
@@ -310,19 +307,19 @@ function divideTriangle(points1, triangles, sphere_r, divideCnt) {
                     edge = new Edge(p1, p2);
 
                     // 辺の中点を作る。
-                    edge.Mid = new Vertex((p1.x + p2.x) / 2, (p1.y + p2.y) / 2, (p1.z + p2.z) / 2);
+                    mids.set(edge, new Vertex((p1.x + p2.x) / 2, (p1.y + p2.y) / 2, (p1.z + p2.z) / 2));
 
                     for (var i = 0; i < i; k++) {
 
                         var k = edge.Endpoints[i].adjacentVertexes.indexOf(edge.Endpoints[(i + 1) % 2]);
                         console.assert(k != -1);
-                        edge.Endpoints[i].adjacentVertexes[k] = edge.Mid;
+                        edge.Endpoints[i].adjacentVertexes[k] = mids.get(edge);
                     }
 
                     edges.push(edge);
                 }
 
-                var mid = edge.Mid;
+                var mid = mids.get(edge);
 
                 midpoints.push(mid);
 
@@ -380,7 +377,7 @@ function divideTriangle(points1, triangles, sphere_r, divideCnt) {
     return [ points2, triangles, edges ];
 }
 
-function setTextureCoords(points: Vertex[], sphere_r) {
+function setTextureCoords(points: Vertex[], sphere_r: number) {
     for (var i = 0; i < points.length; i++) {
         var p = points[i];
         console.assert(i < 12 && p.adjacentVertexes.length == 5 || p.adjacentVertexes.length == 6);
@@ -413,14 +410,14 @@ function setTextureCoords(points: Vertex[], sphere_r) {
 }
 
 export function makeEarthBuffers(tex_inv: TextureInfo) {
-    let [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
+    let [ points1, triangles1, sphere_r ] : [ Vertex[], Triangle[], number ] = makeRegularIcosahedron();
 
     let [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, 4);
 
     setTextureCoords(points2, sphere_r);
 
     // 頂点インデックス
-    var vertexIndices = [];
+    var vertexIndices : number[] = [];
 
     triangles2.forEach(x =>
         vertexIndices.push(points2.indexOf(x.Vertexes[0]), points2.indexOf(x.Vertexes[1]), points2.indexOf(x.Vertexes[2]))
@@ -430,19 +427,19 @@ export function makeEarthBuffers(tex_inv: TextureInfo) {
     points2.forEach(p => SetNorm(p));
 
     // 位置の配列
-    var vertices = [];
+    var vertices : number[] = [];
     points2.forEach(p =>
         vertices.push(p.x, p.y, p.z)
     );
 
     // 法線の配列
-    var vertexNormals = [];
+    var vertexNormals : number[] = [];
     points2.forEach(p =>
         vertexNormals.push(p.nx, p.ny, p.nz)
     );
 
     // テクスチャ座標
-    var textureCoords = [];
+    var textureCoords : number[] = [];
     points2.forEach(p =>
         textureCoords.push(p.texX, p.texY)
     );
