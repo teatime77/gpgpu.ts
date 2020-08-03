@@ -241,8 +241,22 @@ export class UserDef extends Drawable {
 export class UserSurface extends UserDef {
     numVertex: number;
 
-    constructor(vertexShader: string, fragmentShader: string, numVertex: number){
-        super(gl.TRIANGLES, vertexShader, fragmentShader);
+    constructor(vertexShader: string, fragmentShader: string, numVertex: number, mode: GLenum = gl.TRIANGLES){
+        super(mode, vertexShader, fragmentShader);
+        this.numVertex = numVertex;
+
+        Object.assign(this.package.args, {
+            vertexPosition : new Float32Array(numVertex)
+        });
+    }
+}
+
+
+export class UserLine extends UserDef {
+    numVertex: number;
+
+    constructor(mode: GLenum, vertexShader: string, fragmentShader: string, numVertex: number){
+        super(mode, vertexShader, fragmentShader);
         this.numVertex = numVertex;
 
         Object.assign(this.package.args, {
@@ -906,7 +920,10 @@ export class GPGPU {
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
             // コンパイル エラーの場合
 
-            alert(gl.getShaderInfoLog(shader));
+            const s = gl.getShaderInfoLog(shader);
+            const src = Array.from(source.split('\n').entries()).map(x => `${x[0] + 1} ${x[1]}`).join('\n');
+            console.log(s + "\n" + '-'.repeat(40) + "\n" + src);
+            alert(s);
             throw new Error();
         }
 
@@ -1273,8 +1290,9 @@ export class GPGPU {
         if (pkg.varyings.length == 0) {
             //  描画する場合
 
-            if(drawable instanceof UserSurface){
+            if(drawable instanceof UserSurface || drawable instanceof UserLine){
     
+                gl.lineWidth(5);                
                 gl.drawArrays(drawable.mode, 0, drawable.numVertex);
                 gl.finish();
             }

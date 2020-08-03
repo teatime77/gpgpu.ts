@@ -289,13 +289,28 @@ class Module {
         }
     }
 
-    *forward2(x: [Tensor,Tensor]) : Generator<Tensor | undefined> {        
-        console.assert(false, '未実装');
+    *forward(x: Tensor | [Tensor,Tensor]) : Generator<Tensor | undefined> {        
+        let y: Tensor | undefined;
+        if(x instanceof Tensor){
+
+            for(y of this.forward1(x)) yield;
+        }
+        else{
+
+            for(y of this.forward2(x)) yield;
+        }
+
+        yield y;
     }
 
-    *forward(x: Tensor) : Generator<Tensor | undefined> {  
+    *forward2(x: [Tensor,Tensor]) : Generator<Tensor | undefined> {        
         console.assert(false, '未実装');
-        yield x as Tensor;
+        throw new Error();
+    }
+
+    *forward1(x: Tensor) : Generator<Tensor | undefined> {  
+        console.assert(false, '未実装');
+        throw new Error();
     }
 
     diff(y: Tensor, name: string = 'y') : string {
@@ -336,7 +351,7 @@ class LeakyReLU extends Module {
         // log(`${this.name} ${this.type} ${this.negative_slope}`)
     }
 
-    *forward(x: Tensor) : Generator<Tensor | undefined>  {
+    *forward1(x: Tensor) : Generator<Tensor | undefined>  {
         running = this as Module;
         yield;
 
@@ -359,7 +374,7 @@ class PixelwiseNormalization extends Module {
         super(obj);
     }
 
-    * forward(x: Tensor){
+    * forward1(x: Tensor){
         running = this as Module;
         yield;
 
@@ -389,7 +404,7 @@ class TruncationTrick extends Module {
     }
 
 
-    *forward(x: Tensor) {
+    *forward1(x: Tensor) {
         running = this as Module;
         yield;
 
@@ -422,7 +437,7 @@ class Amplify extends Module {
         this.rate = obj['rate'];
     }
 
-    *forward(x: Tensor) {
+    *forward1(x: Tensor) {
         running = this as Module;
         yield;
 
@@ -444,7 +459,7 @@ class AddChannelwiseBias extends Module {
         // log(`${this.name} ${this.type} ${this.bias.shape_last()}`)
     }
 
-    *forward(x: Tensor) {
+    *forward1(x: Tensor) {
         running = this as Module;
         yield;
         const startTime = Date.now();
@@ -477,7 +492,7 @@ class EqualizedFullyConnect extends Module {
         // log(`${this.name} ${this.type} ${this.weight.shape_last()}`)
     }
 
-    *forward(x: Tensor) {
+    *forward1(x: Tensor) {
         running = this as Module;
         yield;
 
@@ -576,7 +591,7 @@ class PixelwiseNoise extends Module {
         this.noise_scaler = obj['noise_scaler'];
     }
 
-    *forward(x: Tensor) {
+    *forward1(x: Tensor) {
         running = this as Module;
         yield;
 
@@ -617,7 +632,7 @@ class FusedBlur3x3 extends Module {
         this.kernel  = Tensor.fromObj(obj['kernel']);
     }
 
-    *forward(x: Tensor) {
+    *forward1(x: Tensor) {
         running = this as Module;
         yield;
 
@@ -1170,10 +1185,10 @@ class ImageGenerator extends Module {
         styles = styles!.view(...styles!.shape.slice(1));
 
         let tmp : Tensor | undefined;
-        for(tmp of this.blocks.modules[0].forward2( [this.const_input, styles.row(0) ] )) yield;
+        for(tmp of this.blocks.modules[0].forward( [this.const_input, styles.row(0) ] )) yield;
 
         let skip : Tensor | undefined;
-        for(skip of this.toRGBs.modules[0].forward2( [tmp!, styles.row(1)] )) yield;
+        for(skip of this.toRGBs.modules[0].forward( [tmp!, styles.row(1)] )) yield;
 
         // log(`FW ${this.name} ${this.type} ${styles.shape} skip:${skip.shape_last()}`)
 
@@ -1185,12 +1200,12 @@ class ImageGenerator extends Module {
             let styF  = styles.row(2 + 2 * idx);
             let styT  = styles.row(3 + 2 * idx);
 
-            for(tmp of convU.forward2( [tmp!,styU] )) yield;
+            for(tmp of convU.forward( [tmp!,styU] )) yield;
 
-            for(tmp of convF.forward2( [tmp!,styF] )) yield;
+            for(tmp of convF.forward( [tmp!,styF] )) yield;
 
             let rgb : Tensor | undefined;
-            for(rgb of toRGB.forward2( [tmp!,styT] )) yield;
+            for(rgb of toRGB.forward( [tmp!,styT] )) yield;
 
             let up_skip = interpolate(skip!);
             skip = rgb!.add(up_skip);
@@ -1210,8 +1225,8 @@ class ModuleListSequential extends Module {
         this.modules = obj['modules'].map((x: any) => parseModel(x));
     }
 
-    *forward(x: Tensor) {
-        let y: Tensor | undefined = x;
+    *forward(x: Tensor | [Tensor,Tensor]) : Generator<Tensor | undefined> {
+        let y: Tensor | [Tensor,Tensor] | undefined = x;
         for(let m of this.modules){
             let startTime = Date.now(); // 開始時間
 
@@ -1232,12 +1247,12 @@ class ModuleListSequential extends Module {
                     gpu_time = `${py_time}|${(m.gpuTime / 1000).toFixed(3)}秒 ${(m.nCalc! / (10000*10000)).toFixed(3)}億回 ${((m.nCalc! / m.gpuTime) / (1000 * 1000)).toFixed(3)}GFLOPS`;
                 }
 
-                let diff = (use_random || i_latent != 0 || m.obj['y'] == undefined ? "" : `diff:${m.diff(y!)}`);
+                let diff = (use_random || i_latent != 0 || m.obj['y'] == undefined ? "" : `diff:${m.diff(y as Tensor)}`);
                 log(`FW ${m.shortType()} ${gpu_shape} ${gpu_time} ${diff}`);
             }
         }
 
-        yield y;
+        yield y as Tensor;
     }
 }
 
