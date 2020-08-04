@@ -218,7 +218,12 @@ export class Lines extends Drawable {
 }
 
 export class ComponentDrawable extends Drawable {
-    children: Drawable[] = [];
+    children: Drawable[];
+
+    constructor(children: Drawable[]){
+        super();
+        this.children = children.slice();
+    }
 }
 
 export class UserDef extends Drawable {
@@ -238,12 +243,14 @@ export class UserDef extends Drawable {
     }
 }
 
-export class UserSurface extends UserDef {
+export class UserMesh extends UserDef {
     numVertex: number;
+    numGroup : number;
 
-    constructor(vertexShader: string, fragmentShader: string, numVertex: number, mode: GLenum = gl.TRIANGLES){
+    constructor(mode: GLenum, vertexShader: string, fragmentShader: string, numVertex: number, numGroup: number = 0){
         super(mode, vertexShader, fragmentShader);
         this.numVertex = numVertex;
+        this.numGroup  = numGroup;
 
         Object.assign(this.package.args, {
             vertexPosition : new Float32Array(numVertex)
@@ -251,19 +258,6 @@ export class UserSurface extends UserDef {
     }
 }
 
-
-export class UserLine extends UserDef {
-    numVertex: number;
-
-    constructor(mode: GLenum, vertexShader: string, fragmentShader: string, numVertex: number){
-        super(mode, vertexShader, fragmentShader);
-        this.numVertex = numVertex;
-
-        Object.assign(this.package.args, {
-            vertexPosition : new Float32Array(numVertex)
-        });
-    }
-}
 
 export class UserPoints extends UserDef {
     constructor(vertexShader: string, fragmentShader: string, args: any = {}, fnc:(self: UserPoints)=>void){
@@ -1290,10 +1284,20 @@ export class GPGPU {
         if (pkg.varyings.length == 0) {
             //  描画する場合
 
-            if(drawable instanceof UserSurface || drawable instanceof UserLine){
+            if(drawable instanceof UserMesh){
     
-                gl.lineWidth(5);                
-                gl.drawArrays(drawable.mode, 0, drawable.numVertex);
+                gl.lineWidth(5);
+                if(drawable.numGroup != 0){
+
+                    for(let i = 0; i < drawable.numVertex; i += drawable.numGroup){
+
+                        gl.drawArrays(drawable.mode, i, drawable.numGroup);
+                    }
+                }   
+                else{
+
+                    gl.drawArrays(drawable.mode, 0, drawable.numVertex);
+                }           
                 gl.finish();
             }
             else{
@@ -1404,6 +1408,7 @@ export class GPGPU {
             for(let child of drawable.children){
                 this.draw(child, modelMat, viewMat, projMat)
             }
+            return;
         }
 
         let pkg = drawable.getParam();
