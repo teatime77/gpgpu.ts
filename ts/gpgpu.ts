@@ -245,17 +245,10 @@ export class UserDef extends Drawable {
 }
 
 export class UserMesh extends UserDef {
-    numVertex: number;
-    numGroup : number;
-
-    constructor(mode: GLenum, vertexShader: string, fragmentShader: string, numVertex: number, numGroup: number = 0){
+    constructor(mode: GLenum, vertexShader: string, fragmentShader: string, numInput: number, numGroup: number | undefined = undefined){
         super(mode, vertexShader, fragmentShader);
-        this.numVertex = numVertex;
-        this.numGroup  = numGroup;
-
-        Object.assign(this.package.args, {
-            vertexPosition : new Float32Array(numVertex)
-        });
+        this.package.numInput = numInput;
+        this.package.numGroup  = numGroup;
     }
 }
 
@@ -268,7 +261,6 @@ export class UserPoints extends UserDef {
 
         this.update = fnc;
     }
-
 }
 
 export class Package{
@@ -284,7 +276,8 @@ export class Package{
 
     vertexIndexBufferInf: WebGLBuffer | undefined;
     textures: TextureInfo[] = [];
-    attribElementCount: number | undefined;
+    numInput: number | undefined;
+    numGroup: number | undefined;
     varyings: ArgInf[] = [];
     attributes: ArgInf[] = [];
     uniforms: ArgInf[] = [];
@@ -939,12 +932,12 @@ export class GPGPU {
             // 要素の個数
             var elemen_count = (attrib.value as Float32Array).length / attrib_dim;
 
-            if(pkg.attribElementCount == undefined){
+            if(pkg.numInput == undefined){
 
-                pkg.attribElementCount = elemen_count;
+                pkg.numInput = elemen_count;
             }
             else{
-                console.assert(pkg.attribElementCount == elemen_count);
+                console.assert(pkg.numInput == elemen_count);
             }
 
             // バッファを作る。
@@ -1147,7 +1140,7 @@ export class GPGPU {
 
             // すべてのvarying変数に対し
             for (let varying of pkg.varyings) {
-                var out_buffer_size = this.vecDim(varying.type) * pkg.attribElementCount! * Float32Array.BYTES_PER_ELEMENT;
+                var out_buffer_size = this.vecDim(varying.type) * pkg.numInput! * Float32Array.BYTES_PER_ELEMENT;
 
                 // Transform Feedbackバッファを作る。
                 varying.feedbackBuffer = gl.createBuffer()!; chk();
@@ -1285,46 +1278,14 @@ export class GPGPU {
         this.setUniformsData(pkg);
 
         console.assert( (pkg.varyings.length == 0) == (pkg.fragmentShader != GPGPU.minFragmentShader) || drawable instanceof UserPoints );
-        if (pkg.varyings.length == 0) {
-            //  描画する場合
 
-            if(drawable instanceof UserMesh){
-    
-                gl.lineWidth(5);
-                if(drawable.numGroup != 0){
+        if(pkg.fragmentShader == GPGPU.minFragmentShader){
 
-                    for(let i = 0; i < drawable.numVertex; i += drawable.numGroup){
-
-                        gl.drawArrays(pkg.mode, i, drawable.numGroup);
-                    }
-                }   
-                else{
-
-                    gl.drawArrays(pkg.mode, 0, drawable.numVertex);
-                }           
-                gl.finish();
-            }
-            else{
-                if(pkg.VertexIndexBuffer == undefined){
-                    throw new Error();
-                }
-
-                // 頂点インデックスバッファをバインドする。
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf!); chk();
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, pkg.VertexIndexBuffer, gl.STATIC_DRAW); chk();
-
-                // 頂点インデックスバッファで描画する。
-                gl.drawElements(pkg.mode, pkg.VertexIndexBuffer.length, gl.UNSIGNED_SHORT, 0); chk();
-            }
+            // ラスタライザを無効にする。
+            gl.enable(gl.RASTERIZER_DISCARD); chk();
         }
-        else {
-            //  描画しない場合
 
-            if(!(drawable instanceof UserDef)){
-
-                // ラスタライザを無効にする。
-                gl.enable(gl.RASTERIZER_DISCARD); chk();
-            }
+        if (pkg.varyings.length != 0){
 
             // Transform Feedbackをバインドする。
             gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, pkg.transformFeedback!); chk();
@@ -1339,18 +1300,36 @@ export class GPGPU {
 
             // Transform Feedbackを開始する。
             gl.beginTransformFeedback(gl.POINTS); chk();    // TRIANGLES
+        }
 
-            // 点ごとの描画をする。
-            gl.drawArrays(gl.POINTS, 0, pkg.attribElementCount!); chk();
+        if(pkg.VertexIndexBuffer != undefined){
+
+            // 頂点インデックスバッファをバインドする。
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf!); chk();
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, pkg.VertexIndexBuffer, gl.STATIC_DRAW); chk();
+
+            // 頂点インデックスバッファで描画する。
+            gl.drawElements(pkg.mode, pkg.VertexIndexBuffer.length, gl.UNSIGNED_SHORT, 0); chk();
+        }
+        else{
+            
+            if(pkg.numGroup != undefined){
+
+                for(let i = 0; i < pkg.numInput!; i += pkg.numGroup){
+
+                    gl.drawArrays(pkg.mode, i, pkg.numGroup);
+                }
+            }
+            else{
+
+                gl.drawArrays(pkg.mode, 0, pkg.numInput!); chk();
+            }
+        }
+
+        if (pkg.varyings.length != 0){
 
             // Transform Feedbackを終了する。
             gl.endTransformFeedback(); chk();
-
-            if(!(drawable instanceof UserDef)){
-
-                // ラスタライザを有効にする。
-                gl.disable(gl.RASTERIZER_DISCARD); chk();
-            }
 
             // すべてのvarying変数に対し
             for (var i = 0; i < pkg.varyings.length; i++) {
@@ -1375,6 +1354,12 @@ export class GPGPU {
             if(drawable instanceof UserDef && drawable.update != undefined){
                 drawable.update(drawable);
             }
+        }
+
+        if(pkg.fragmentShader == GPGPU.minFragmentShader){
+
+            // ラスタライザを有効にする。
+            gl.disable(gl.RASTERIZER_DISCARD); chk();
         }
 
         // プログラムの使用を終了する。
