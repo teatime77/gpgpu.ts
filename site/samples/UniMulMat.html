@@ -27,7 +27,11 @@ function MatStr(m, nrow, ncol, row_major_order) {
         return s;
     }
 
-    function onBodyLoad() {
+function onBodyLoad() {
+
+    // GPGPUのオブジェクトを作ります。
+    var gpgpu = gpgputs.CreateGPGPU();
+    
     // 頂点シェーダのプログラムを文字列で記述します。
     var vertex_shader =
        `// 入力変数A
@@ -59,6 +63,8 @@ function MatStr(m, nrow, ncol, row_major_order) {
         // idはプログラム内でユニークであれば何でも構いません。
         id: "UniMulMat",
 
+        mode: gpgputs.gl.POINTS,
+
         // 頂点シェーダの文字列を指定します。
         vertexShader: vertex_shader,
 
@@ -69,9 +75,6 @@ function MatStr(m, nrow, ncol, row_major_order) {
             "C": C,
         }
     });
-
-    // GPGPUのオブジェクトを作ります。
-    var gpgpu = gpgputs.CreateGPGPU();
 
     // パラメータを使い計算します。
     gpgpu.compute(pkg);

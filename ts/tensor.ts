@@ -551,6 +551,8 @@ class EqualizedFullyConnect extends Module {
             // idはプログラム内でユニークであれば何でも構いません。
             id: "TexMulMat",
 
+            mode: gl.POINTS,
+
             // 頂点シェーダの文字列を指定します。
             vertexShader: Linear,
 
@@ -713,6 +715,7 @@ class FusedBlur3x3 extends Module {
         this.gpuTime = 0;
         let pkg = new Package({
             id : `${this.name}`,
+            mode: gl.POINTS,
             vertexShader: shader_src,
             args : {
                 "zero"  : zero,
@@ -887,6 +890,7 @@ class ConvTranspose2d extends Module {
 
         let pkg = new Package({
             id : `${this.name}`,
+            mode: gl.POINTS,
             vertexShader: shader_src,
             args : {
                 "in_channel_base": 0,
@@ -1128,6 +1132,7 @@ class Conv2d extends Module {
 
         let pkg = new Package({
             id : `${this.name}`,
+            mode: gl.POINTS,
             vertexShader: shader_src,
             args : {
                 "in_channel_base": 0,

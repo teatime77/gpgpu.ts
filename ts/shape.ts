@@ -558,6 +558,7 @@ export class Circle extends Drawable {
             
         this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
+            mode: gl.TRIANGLES,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
@@ -601,6 +602,7 @@ export class RegularIcosahedron extends Drawable {
             
         this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
+            mode: gl.TRIANGLES,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
@@ -647,6 +649,7 @@ export class GeodesicPolyhedron extends Drawable {
             
         this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
+            mode: gl.TRIANGLES,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
@@ -700,6 +703,7 @@ export class Tube extends Drawable {
             
         this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
+            mode: gl.TRIANGLES,
             vertexShader: GPGPU.planeVertexShader,
             fragmentShader: GPGPU.planeFragmentShader,
             args: mesh,
@@ -828,6 +832,7 @@ export class Label extends Drawable {
     
         this.package = new Package({
             id: `label${Drawable.count++}`,
+            mode: gl.TRIANGLES,
             vertexShader: GPGPU.planeTextureVertexShader,//.textureSphereVertexShader,
             fragmentShader: GPGPU.planeTextureFragmentShader,//defaultFragmentShader,
             args: mesh,
@@ -855,6 +860,7 @@ export class ImageDrawable extends Drawable {
 
             this.package = new Package({
                 id: "Earth",
+                mode: gl.TRIANGLES,
                 vertexShader: GPGPU.textureSphereVertexShader,
                 fragmentShader: GPGPU.defaultFragmentShader,
                 args: mesh,

@@ -1,6 +1,6 @@
 namespace gpgputs {
 
-let mygpgpu;
+let mygpgpu: GPGPU;
 
 class TextDrawable extends Drawable {
     canvas_2d : HTMLCanvasElement;
@@ -35,6 +35,7 @@ class TextDrawable extends Drawable {
 
             this.package = new Package({
                 id: "label",
+                mode: gl.TRIANGLES,
                 vertexShader: GPGPU.textureSphereVertexShader,
                 fragmentShader: GPGPU.defaultFragmentShader,
                 args: mesh,
@@ -53,9 +54,10 @@ let labelDrawable1 : Label;
 let labelDrawable2 : Label;
 
 export function testBodyOnLoad(){
+    var canvas = document.getElementById("webgl-canvas") as HTMLCanvasElement;
+    mygpgpu = CreateGPGPU(canvas);
+
     imageDrawable = new ImageDrawable("../img/world.topo.bathy.200408.2048x2048.png", ()=>{
-        var canvas = document.getElementById("webgl-canvas") as HTMLCanvasElement;
-        mygpgpu = CreateGPGPU(canvas);
         mygpgpu.startDraw3D([ 
             imageDrawable,
             labelDrawable1,

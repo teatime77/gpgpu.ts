@@ -28,6 +28,10 @@ function MatStr(m, nrow, ncol, row_major_order) {
     }
 
     function onBodyLoad() {
+    
+        // GPGPUのオブジェクトを作ります。
+        var gpgpu = gpgputs.CreateGPGPU();
+
         var vertex_shader =
            `in float zero;
 
@@ -81,13 +85,12 @@ function MatStr(m, nrow, ncol, row_major_order) {
         // 出力変数Cは配列のサイズ(2 * 2)を指定して作ります。
         var C = new Float32Array(2 * 2);
 
-        // GPGPUのオブジェクトを作ります。
-        var gpgpu = gpgputs.CreateGPGPU();
-
         // 計算のパラメータ
         var pkg = new gpgputs.Package({
             // idはプログラム内でユニークであれば何でも構いません。
             id: "TexMulMatVec4",
+
+            mode: gpgputs.gl.POINTS,
 
             // 頂点シェーダの文字列を指定します。
             vertexShader: vertex_shader

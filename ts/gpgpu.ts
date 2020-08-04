@@ -155,6 +155,7 @@ export class Points extends Drawable {
             
         this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
+            mode: gl.POINTS,
             vertexShader: VertexShader.points,
             fragmentShader: GPGPU.pointFragmentShader,
             args: mesh,
@@ -209,6 +210,7 @@ export class Lines extends Drawable {
             
         this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
+            mode: gl.LINES,
             vertexShader: VertexShader.lines,
             fragmentShader: GPGPU.pointFragmentShader,
             args: mesh,
@@ -227,15 +229,14 @@ export class ComponentDrawable extends Drawable {
 }
 
 export class UserDef extends Drawable {
-    mode: GLenum;
     update : ((self: UserDef)=>void) | undefined = undefined;
 
     constructor(mode: GLenum,  vertexShader: string, fragmentShader: string){
         super();
-        this.mode = mode;
 
         this.package = new Package({
             id: `${this.constructor.name}.${Drawable.count++}`,
+            mode: mode,
             vertexShader: vertexShader,
             fragmentShader: fragmentShader,
             args: {}
@@ -272,6 +273,7 @@ export class UserPoints extends UserDef {
 
 export class Package{
     id!: string;
+    mode!: GLenum;
     vertexShader!: string;
     fragmentShader: string = GPGPU.minFragmentShader;
     args: Mesh;
@@ -291,6 +293,7 @@ export class Package{
         if(obj != undefined){
             Object.assign(this, obj);
         }
+        console.assert(this.mode != undefined);
     }
 
 
@@ -1281,6 +1284,7 @@ export class GPGPU {
         // ユニフォーム変数の値をセットする。
         this.setUniformsData(pkg);
 
+        console.assert( (pkg.varyings.length == 0) == (pkg.fragmentShader != GPGPU.minFragmentShader) || drawable instanceof UserPoints );
         if (pkg.varyings.length == 0) {
             //  描画する場合
 
@@ -1291,12 +1295,12 @@ export class GPGPU {
 
                     for(let i = 0; i < drawable.numVertex; i += drawable.numGroup){
 
-                        gl.drawArrays(drawable.mode, i, drawable.numGroup);
+                        gl.drawArrays(pkg.mode, i, drawable.numGroup);
                     }
                 }   
                 else{
 
-                    gl.drawArrays(drawable.mode, 0, drawable.numVertex);
+                    gl.drawArrays(pkg.mode, 0, drawable.numVertex);
                 }           
                 gl.finish();
             }
@@ -1309,21 +1313,8 @@ export class GPGPU {
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pkg.vertexIndexBufferInf!); chk();
                 gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, pkg.VertexIndexBuffer, gl.STATIC_DRAW); chk();
 
-                if(drawable instanceof Points){
-
-                    // 頂点のリストを描画する。
-                    gl.drawElements(gl.POINTS, pkg.VertexIndexBuffer.length, gl.UNSIGNED_SHORT, 0); chk();
-                }
-                else if(drawable instanceof Lines){
-
-                    // 線分のリストを描画する。
-                    gl.drawElements(gl.LINES, pkg.VertexIndexBuffer.length, gl.UNSIGNED_SHORT, 0); chk();
-                }
-                else{
-
-                    // 三角形のリストを描画する。
-                    gl.drawElements(gl.TRIANGLES, pkg.VertexIndexBuffer.length, gl.UNSIGNED_SHORT, 0); chk();
-                }
+                // 頂点インデックスバッファで描画する。
+                gl.drawElements(pkg.mode, pkg.VertexIndexBuffer.length, gl.UNSIGNED_SHORT, 0); chk();
             }
         }
         else {

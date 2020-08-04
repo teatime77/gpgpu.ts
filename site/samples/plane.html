@@ -33,6 +33,7 @@ class MyDraw {
 
             this.package = new gpgputs.Package({
                 id: "Earth",
+                mode: gpgputs.gl.TRIANGLES,
                 vertexShader: gpgputs.GPGPU.textureSphereVertexShader,
                 fragmentShader: gpgputs.GPGPU.defaultFragmentShader,
                 args: mesh,
