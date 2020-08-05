@@ -229,7 +229,7 @@ export class ComponentDrawable extends Drawable {
 }
 
 export class UserDef extends Drawable {
-    constructor(mode: GLenum,  vertexShader: string, fragmentShader: string){
+    constructor(mode: GLenum,  vertexShader: string, fragmentShader: string, args: any = {}){
         super();
 
         this.package = new Package({
@@ -237,7 +237,7 @@ export class UserDef extends Drawable {
             mode: mode,
             vertexShader: vertexShader,
             fragmentShader: fragmentShader,
-            args: {}
+            args: args
         });
     }
 }
@@ -250,14 +250,6 @@ export class UserMesh extends UserDef {
     }
 }
 
-
-export class UserPoints extends UserDef {
-    constructor(vertexShader: string, fragmentShader: string, args: any = {}){
-        super(gl.POINTS, vertexShader, fragmentShader);
-
-        Object.assign(this.package.args, args);
-    }
-}
 
 export class Package{
     id!: string;
@@ -393,7 +385,8 @@ class BindArg{
 
     constructor(outName   : string, inName   : string, outPackage: Package, inPackage: Package){
         console.assert(outPackage.args[outName] instanceof Float32Array);
-        console.assert(inPackage.args[inName] instanceof Float32Array);
+        let inArg = inPackage.args[inName];
+        console.assert(inArg instanceof Float32Array || inArg instanceof TextureInfo);
 
         this.outName    = outName;
         this.inName     = inName;
@@ -982,6 +975,8 @@ export class GPGPU {
             // attribute変数の位置と変数名をバインドする。
             gl.bindAttribLocation(pkg.program!, attrib.AttribLoc, attrib.name);
         }
+
+        console.assert(pkg.numInput != undefined);
     }
 
     /*
@@ -1307,8 +1302,6 @@ export class GPGPU {
         // ユニフォーム変数の値をセットする。
         this.setUniformsData(pkg);
 
-        console.assert( (pkg.varyings.length == 0) == (pkg.fragmentShader != GPGPU.minFragmentShader) || drawable instanceof UserPoints );
-
         if(pkg.fragmentShader == GPGPU.minFragmentShader){
 
             // ラスタライザを無効にする。
@@ -1383,9 +1376,21 @@ export class GPGPU {
 
             for(let pipe of pkg.pipes){
                 let out_val = pipe.outPackage.args[pipe.outName];
-                if(pipe.inPackage.args[pipe.inName] instanceof Float32Array && out_val instanceof Float32Array){
+                let in_val  = pipe.inPackage.args[pipe.inName];
+                if(out_val instanceof Float32Array){
 
-                    pipe.inPackage.args[pipe.inName] = out_val.slice();
+                    if(in_val instanceof Float32Array){
+
+                        pipe.inPackage.args[pipe.inName] = out_val.slice();
+                    }
+                    else if(in_val instanceof TextureInfo){
+
+                        in_val.value = out_val.slice();
+                        in_val.dirty = true;
+                    }
+                    else{
+                        throw new Error();
+                    }
                 }
                 else{
                     throw new Error();
