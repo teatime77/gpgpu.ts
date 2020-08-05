@@ -229,8 +229,6 @@ export class ComponentDrawable extends Drawable {
 }
 
 export class UserDef extends Drawable {
-    update : ((self: UserDef)=>void) | undefined = undefined;
-
     constructor(mode: GLenum,  vertexShader: string, fragmentShader: string){
         super();
 
@@ -254,12 +252,10 @@ export class UserMesh extends UserDef {
 
 
 export class UserPoints extends UserDef {
-    constructor(vertexShader: string, fragmentShader: string, args: any = {}, fnc:(self: UserPoints)=>void){
+    constructor(vertexShader: string, fragmentShader: string, args: any = {}){
         super(gl.POINTS, vertexShader, fragmentShader);
 
         Object.assign(this.package.args, args);
-
-        this.update = fnc;
     }
 }
 
@@ -281,6 +277,7 @@ export class Package{
     varyings: ArgInf[] = [];
     attributes: ArgInf[] = [];
     uniforms: ArgInf[] = [];
+    pipes: BindArg[] = [];
 
     constructor(obj: any = undefined){
         if(obj != undefined){
@@ -289,6 +286,9 @@ export class Package{
         console.assert(this.mode != undefined);
     }
 
+    bind(outName: string, inName: string, inPackage: Package | undefined = undefined){
+        this.pipes.push(new BindArg(outName, inName, this, (inPackage == undefined ? this : inPackage)));
+    }
 
     /*
         指定したidのWebGLのオブジェクトをすべて削除します。
@@ -382,7 +382,24 @@ class ArgInf {
         this.value = value;
         this.type  = type;
         this.isArray = is_array;
+    }
+}
 
+class BindArg{
+    outName   : string;
+    inName   : string;
+    outPackage: Package;
+    inPackage: Package;
+
+    constructor(outName   : string, inName   : string, outPackage: Package, inPackage: Package){
+        console.assert(outPackage.args[outName] instanceof Float32Array);
+        console.assert(inPackage.args[inName] instanceof Float32Array);
+
+        this.outName    = outName;
+        this.inName     = inName;
+
+        this.outPackage = outPackage;
+        this.inPackage  = inPackage;
     }
 }
 
@@ -724,8 +741,10 @@ export class GPGPU {
         シェーダのソースコードを解析します。
     */
     parseShader(pkg: Package) {
+        let fragIn : string[] = [];
+
         // 頂点シェーダとフラグメントシェーダのソースに対し
-        for(let shader_text of[ pkg.vertexShader,  pkg.fragmentShader ]) {
+        for(let shader_text of[ pkg.fragmentShader, pkg.vertexShader ]) {
             if(shader_text == GPGPU.vertexPositionShader){
                 continue;
             }
@@ -754,15 +773,9 @@ export class GPGPU {
                     continue;
                 }
 
-                if (shader_text == pkg.fragmentShader && tkn0 != "uniform") {
-                    // フラグメントシェーダで uniform でない場合 ( フラグメントシェーダの入力(in)と出力(out)はアプリ側では使わない。 )
-
-                    continue;
-                }
                 assert(tkn1 == "int" || tkn1 == "float" || tkn1 == "vec2" || tkn1 == "vec3" || tkn1 == "vec4" ||
                     tkn1 == "sampler2D" || tkn1 == "sampler3D" ||
                     tkn1 == "mat4" || tkn1 == "mat3" || tkn1 == "bool");
-
 
                 var arg_name;
                 var is_array = false;
@@ -794,12 +807,29 @@ export class GPGPU {
                     }
                 }
 
+                if (shader_text == pkg.fragmentShader && tkn0 != "uniform") {
+                    // フラグメントシェーダで uniform でない場合 ( フラグメントシェーダの入力(in)と出力(out)はアプリ側では使わない。 )
+
+                    if(tkn0 == "in"){
+                        fragIn.push(arg_name);
+                    }
+
+                    continue;
+                }
+
                 // 変数の値を得る。
                 var arg_val = pkg.args[arg_name];
 
                 if (arg_val == undefined) {
+                    
                     if(tokens[0] == "out"){
-                        continue;
+                        if(fragIn.includes(arg_name)){
+
+                            continue;
+                        }
+
+                        console.log(`不明変数 ${tokens[0]} ${arg_name} ${shader_text == pkg.vertexShader ? "頂点" : "ピクセル"}`);
+                        throw new Error();
                     }
                 }
 
@@ -1312,7 +1342,7 @@ export class GPGPU {
             gl.drawElements(pkg.mode, pkg.VertexIndexBuffer.length, gl.UNSIGNED_SHORT, 0); chk();
         }
         else{
-            
+
             if(pkg.numGroup != undefined){
 
                 for(let i = 0; i < pkg.numInput!; i += pkg.numGroup){
@@ -1351,8 +1381,15 @@ export class GPGPU {
             // Transform Feedbackのバインドを解く。
             gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null); chk();
 
-            if(drawable instanceof UserDef && drawable.update != undefined){
-                drawable.update(drawable);
+            for(let pipe of pkg.pipes){
+                let out_val = pipe.outPackage.args[pipe.outName];
+                if(pipe.inPackage.args[pipe.inName] instanceof Float32Array && out_val instanceof Float32Array){
+
+                    pipe.inPackage.args[pipe.inName] = out_val.slice();
+                }
+                else{
+                    throw new Error();
+                }
             }
         }
 
@@ -1429,7 +1466,7 @@ export class GPGPU {
         // カラーバッファと深度バッファをクリアする。
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); chk();
 
-        let viewMat = mat4.create();   // drawable.transform
+        let viewMat = mat4.create();
         mat4.identity(viewMat);
 
         mat4.translate(viewMat, [this.drawParam.x, this.drawParam.y, this.drawParam.z]);
