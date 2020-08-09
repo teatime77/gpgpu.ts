@@ -270,6 +270,9 @@ export class Package{
     attributes: ArgInf[] = [];
     uniforms: ArgInf[] = [];
     pipes: BindArg[] = [];
+    update : (()=>void) | undefined = undefined;
+    fps: number = 0;
+    time: number = 0;
 
     constructor(obj: any = undefined){
         if(obj != undefined){
@@ -1385,6 +1388,7 @@ export class GPGPU {
                     }
                     else if(in_val instanceof TextureInfo){
 
+                        console.assert(in_val.value instanceof Float32Array && in_val.value.length == out_val.length);
                         in_val.value = out_val.slice();
                         in_val.dirty = true;
                     }
@@ -1406,6 +1410,10 @@ export class GPGPU {
 
         // プログラムの使用を終了する。
         gl.useProgram(null); chk();
+
+        if(pkg.update != undefined){
+            pkg.update();
+        }
     }
 
     /*
@@ -1432,6 +1440,12 @@ export class GPGPU {
         let pkg = drawable.getParam();
 
         if(pkg != null){
+
+            let msec = (new Date()).getTime();
+            if(pkg.fps != 0 && msec - pkg.time < 1000 / pkg.fps){
+                return;
+            }
+            pkg.time = msec;
 
             let projViewModelMat = mat4.create();
             mat4.multiply(projMat, viewModelMat, projViewModelMat);
