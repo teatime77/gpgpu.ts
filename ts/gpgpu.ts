@@ -387,9 +387,21 @@ class BindArg{
     inPackage: Package;
 
     constructor(outName   : string, inName   : string, outPackage: Package, inPackage: Package){
-        console.assert(outPackage.args[outName] instanceof Float32Array);
+        let out_val = outPackage.args[outName] as Float32Array;
+        console.assert(out_val instanceof Float32Array);
         let inArg = inPackage.args[inName];
-        console.assert(inArg instanceof Float32Array || inArg instanceof TextureInfo);
+
+        if(inArg instanceof Float32Array){
+
+            console.assert(out_val.length == inArg.length);
+        }
+        else if(inArg instanceof TextureInfo && inArg.value instanceof Float32Array){
+
+            console.assert(out_val.length == inArg.value.length);
+        }
+        else{
+            throw new Error();
+        }
 
         this.outName    = outName;
         this.inName     = inName;
