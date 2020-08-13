@@ -36,6 +36,28 @@ export function chk() {
 }
 
 
+    /*
+        ベクトルの次元を返します。
+    */
+function vecDim(tp: string) : number {
+    if (tp == "vec4") {
+        return 4;
+    }
+    else if (tp == "vec3") {
+        return 3;
+    }
+    else if (tp == "vec2") {
+        return 2;
+    }
+    else if(tp == "float"){
+        return 1;
+    }
+    else{
+        throw new Error();
+    }
+}
+
+
 export class Vec3 {
     x: number;
     y: number;
@@ -351,7 +373,7 @@ export class TextureInfo {
     texelType: string | null;
     samplerType: string | undefined;
     shape: number[] | null;
-    value: TextureValue;
+    value: TextureValue | undefined;
 
     Texture: WebGLTexture | undefined;
     locTexture: WebGLUniformLocation | undefined;
@@ -359,8 +381,15 @@ export class TextureInfo {
     /*
         TextureInfoのコンストラクタ
     */
-    constructor(texel_type: string | null, shape: number[] | null, value: TextureValue) {
-        console.assert(texel_type != null || !(value instanceof Float32Array));
+    constructor(texel_type: string | null, shape: number[] | null, value: TextureValue | undefined = undefined) {
+        console.assert(texel_type != null || value != undefined && !(value instanceof Float32Array));
+
+        if(value == undefined){
+            let dim = vecDim(texel_type!);
+
+            let cnt = shape!.reduce((x,y) => x*y, 1);
+            value = new Float32Array(dim * cnt);
+        }
 
         // テクセルの型
         this.texelType = texel_type;
@@ -682,7 +711,7 @@ export class GPGPU {
     TEXTUREs: number[];
     packages: Package[] = [];
     drawables: AbsDrawable[] = [];
-    drawParam: DrawParam = new DrawParam(0, 0, 0, 0, -5.0);;
+    drawParam: DrawParam = new DrawParam(0, 0, 0, 0, -5.0);
     ui3D : UI3D;
 
     /*
@@ -742,7 +771,7 @@ export class GPGPU {
     /*
         テクスチャ情報を作ります。
     */
-    makeTextureInfo(texel_type: string, shape: number[], value: TextureValue) {
+    makeTextureInfo(texel_type: string, shape: number[], value: TextureValue | undefined = undefined) {
         return new TextureInfo(texel_type, shape, value);
     }
 
@@ -785,7 +814,7 @@ export class GPGPU {
 
                 // 最初、2番目、3番目のトークン
                 var tkn0 = tokens[0];
-                var tkn1 = tokens[1];
+                var type_name = tokens[1];
                 var tkn2 = tokens[2];
 
                 if (tkn0 != "in" && tkn0 != "uniform" && tkn0 != "out") {
@@ -793,9 +822,9 @@ export class GPGPU {
                     continue;
                 }
 
-                assert(tkn1 == "int" || tkn1 == "float" || tkn1 == "vec2" || tkn1 == "vec3" || tkn1 == "vec4" ||
-                    tkn1 == "sampler2D" || tkn1 == "sampler3D" ||
-                    tkn1 == "mat4" || tkn1 == "mat3" || tkn1 == "bool");
+                assert(type_name == "int" || type_name == "float" || type_name == "vec2" || type_name == "vec3" || type_name == "vec4" ||
+                    type_name == "sampler2D" || type_name == "sampler3D" ||
+                    type_name == "mat4" || type_name == "mat3" || type_name == "bool");
 
                 var arg_name;
                 var is_array = false;
@@ -848,12 +877,17 @@ export class GPGPU {
                             continue;
                         }
 
-                        console.log(`不明変数 ${tokens[0]} ${arg_name} ${shader_text == pkg.vertexShader ? "頂点" : "ピクセル"}`);
-                        throw new Error();
+                        let dim = vecDim(type_name);
+
+                        let value = new Float32Array(dim * pkg.numInput!);
+                        pkg.args[arg_name] = value;
+                        let arg_inf = new ArgInf(arg_name, value, type_name, is_array );
+                        pkg.varyings.push(arg_inf);
+                        continue;
                     }
                 }
 
-                if (tkn1 == "sampler2D" || tkn1 == "sampler3D") {
+                if (type_name == "sampler2D" || type_name == "sampler3D") {
                     // テクスチャのsamplerの場合
 
                     assert(tokens[0] == "uniform" && arg_val instanceof TextureInfo);
@@ -863,7 +897,7 @@ export class GPGPU {
                     tex_inf.name = arg_name;
 
                     // samplerのタイプをセットする。
-                    tex_inf.samplerType = tkn1;
+                    tex_inf.samplerType = type_name;
 
                     // 配列かどうかをセットする。
                     tex_inf.isArray = is_array;
@@ -875,7 +909,7 @@ export class GPGPU {
                     // テクスチャのsamplerでない場合
 
                     // 変数の名前、値、型、配列かどうかをセットする。
-                    var arg_inf = new ArgInf(arg_name, arg_val as (Float32Array | number), tkn1, is_array );
+                    var arg_inf = new ArgInf(arg_name, arg_val as (Float32Array | number), type_name, is_array );
 
                     switch (tokens[0]) {
                         case "in":
@@ -977,7 +1011,7 @@ export class GPGPU {
         // すべてのattribute変数に対し
         for (let attrib of pkg.attributes) {
             // attribute変数の次元
-            var attrib_dim = this.vecDim(attrib.type);
+            var attrib_dim = vecDim(attrib.type);
 
             // 要素の個数
             var elemen_count = (attrib.value as Float32Array).length / attrib_dim;
@@ -1135,24 +1169,6 @@ export class GPGPU {
     }
 
     /*
-        ベクトルの次元を返します。
-    */
-    vecDim(tp: string) {
-        if (tp == "vec4") {
-            return 4;
-        }
-        else if (tp == "vec3") {
-            return 3;
-        }
-        else if (tp == "vec2") {
-            return 2;
-        }
-        else {
-            return 1;
-        }
-    }
-
-    /*
         ユニフォーム変数のロケーションをセットします。
     */
     setUniformLocation(pkg: Package) {
@@ -1192,7 +1208,7 @@ export class GPGPU {
 
             // すべてのvarying変数に対し
             for (let varying of pkg.varyings) {
-                var out_buffer_size = this.vecDim(varying.type) * pkg.numInput! * Float32Array.BYTES_PER_ELEMENT;
+                var out_buffer_size = vecDim(varying.type) * pkg.numInput! * Float32Array.BYTES_PER_ELEMENT;
 
                 // Transform Feedbackバッファを作る。
                 varying.feedbackBuffer = gl.createBuffer()!; chk();
@@ -1218,7 +1234,7 @@ export class GPGPU {
     setAttribData(pkg: Package) {
         // すべてのattribute変数に対し
         for (let attrib of pkg.attributes) {
-            var dim = this.vecDim(attrib.type);
+            var dim = vecDim(attrib.type);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, attrib.AttribBuffer!); chk();
 
