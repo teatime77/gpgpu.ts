@@ -7,7 +7,12 @@ class TextDrawable extends Drawable {
     box : Box;
 
     constructor(box : Box){
-        super();
+        super({
+            id: "label",
+            mode: gl.TRIANGLES,
+            vertexShader: GPGPU.textureSphereVertexShader,
+            fragmentShader: GPGPU.defaultFragmentShader,
+        });
         this.box = box;
         this.canvas_2d = document.getElementById("canvas-2d") as HTMLCanvasElement;
         let ctx = this.canvas_2d.getContext('2d')!;
@@ -29,21 +34,15 @@ class TextDrawable extends Drawable {
     }
 
     onDraw() {
-        if (!this.package) {
+        if (!this.args) {
 
             var [mesh, idx_array] = makePlaneBuffers(this.box, 11, 11, new TextureInfo(null, null, this.canvas_2d));
 
-            this.package = new Package({
-                id: "label",
-                mode: gl.TRIANGLES,
-                vertexShader: GPGPU.textureSphereVertexShader,
-                fragmentShader: GPGPU.defaultFragmentShader,
-                args: mesh,
-                VertexIndexBuffer: idx_array
-            });
+            this.args = mesh;
+            this.VertexIndexBuffer = idx_array;
         }
 
-        return this.package;
+        return this;
     }
 }
 

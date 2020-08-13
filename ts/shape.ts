@@ -516,7 +516,13 @@ export function makePlaneBuffers(box: Box, nx: number, ny: number, tex_inv: Text
 
 export class Circle extends Drawable {
     constructor(color: Color, numDivision: number){
-        super();
+        super({
+            mode: gl.TRIANGLES,
+            vertexShader: GPGPU.planeVertexShader,
+            fragmentShader: GPGPU.planeFragmentShader,
+        });
+
+        this.id = `${this.constructor.name}.${Drawable.count++}`;
 
         // 位置の配列
         let vertices = [];
@@ -543,6 +549,9 @@ export class Circle extends Drawable {
             vertexIndices.push(idx, (idx + 1) % numDivision, numDivision);
         }
 
+        this.VertexIndexBuffer = new Uint16Array(vertexIndices);
+
+
         // 円の中心
         vertices.push(0, 0, 0);
         vertexNormals.push(0, 0, 1);
@@ -550,26 +559,23 @@ export class Circle extends Drawable {
         // 色の配列
         let vertexColors = this.getVertexColors(color, vertices.length / 3);
     
-        let mesh = {
+        this.args = {
             vertexPosition: new Float32Array(vertices),
             vertexNormal: new Float32Array(vertexNormals),
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
-            
-        this.package = new Package({
-            id: `${this.constructor.name}.${Drawable.count++}`,
-            mode: gl.TRIANGLES,
-            vertexShader: GPGPU.planeVertexShader,
-            fragmentShader: GPGPU.planeFragmentShader,
-            args: mesh,
-            VertexIndexBuffer: new Uint16Array(vertexIndices)
-        });
     }
 }
 
 export class RegularIcosahedron extends Drawable {
     constructor(color: Color){
-        super();
+        super({
+            mode: gl.TRIANGLES,
+            vertexShader: GPGPU.planeVertexShader,
+            fragmentShader: GPGPU.planeFragmentShader,
+        });
+
+        this.id = `${this.constructor.name}.${Drawable.count++}`;
 
         let [ points, triangles, sphere_r ] = makeRegularIcosahedron();
 
@@ -590,31 +596,30 @@ export class RegularIcosahedron extends Drawable {
                 vertexIndices.push(i);
             }
         });
-    
+
+        this.VertexIndexBuffer = new Uint16Array(vertexIndices);
+        
         // 色の配列
         let vertexColors = this.getVertexColors(color, points.length);
     
-        let mesh = {
+        this.args = {
             vertexPosition: new Float32Array(positions),
             vertexNormal: new Float32Array(normals),
             vertexColor: new Float32Array(vertexColors),
-        } as Mesh;
-            
-        this.package = new Package({
-            id: `${this.constructor.name}.${Drawable.count++}`,
-            mode: gl.TRIANGLES,
-            vertexShader: GPGPU.planeVertexShader,
-            fragmentShader: GPGPU.planeFragmentShader,
-            args: mesh,
-            VertexIndexBuffer: new Uint16Array(vertexIndices)
-        });
+        } as Mesh;       
     }
 }
 
 
 export class GeodesicPolyhedron extends Drawable {
     constructor(color: Color, divideCnt: number){
-        super();
+        super({
+            mode: gl.TRIANGLES,
+            vertexShader: GPGPU.planeVertexShader,
+            fragmentShader: GPGPU.planeFragmentShader,
+        });
+
+        this.id = `${this.constructor.name}.${Drawable.count++}`;
 
         let [ points1, triangles1, sphere_r ] = makeRegularIcosahedron();
         let [ points2, triangles2, edges ] = divideTriangle(points1, triangles1, sphere_r, divideCnt);
@@ -637,31 +642,30 @@ export class GeodesicPolyhedron extends Drawable {
                 vertexIndices.push(i);
             }
         });
-    
+
+        this.VertexIndexBuffer = new Uint16Array(vertexIndices);
+
         // 色の配列
         let vertexColors = this.getVertexColors(color, points2.length);
     
-        let mesh = {
+        this.args = {
             vertexPosition: new Float32Array(positions),
             vertexNormal: new Float32Array(normals),
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
-            
-        this.package = new Package({
-            id: `${this.constructor.name}.${Drawable.count++}`,
-            mode: gl.TRIANGLES,
-            vertexShader: GPGPU.planeVertexShader,
-            fragmentShader: GPGPU.planeFragmentShader,
-            args: mesh,
-            VertexIndexBuffer: new Uint16Array(vertexIndices)
-        });
     }
 }
 
 
 export class Tube extends Drawable {
     constructor(color: Color, numDivision: number){
-        super();
+        super({
+            mode: gl.TRIANGLES,
+            vertexShader: GPGPU.planeVertexShader,
+            fragmentShader: GPGPU.planeFragmentShader,
+        });
+
+        this.id = `${this.constructor.name}.${Drawable.count++}`;
 
         // 位置の配列
         let vertices = [];
@@ -691,24 +695,17 @@ export class Tube extends Drawable {
             vertexIndices.push(i1, i2, i3);
             vertexIndices.push(i3, i2, i4);
         }
-    
+
+        this.VertexIndexBuffer = new Uint16Array(vertexIndices);
+        
         // 色の配列
         let vertexColors = this.getVertexColors(color, vertices.length / 3);
 
-        let mesh = {
+        this.args = {
             vertexPosition: new Float32Array(vertices),
             vertexNormal: new Float32Array(vertexNormals),
             vertexColor: new Float32Array(vertexColors),
         } as Mesh;
-            
-        this.package = new Package({
-            id: `${this.constructor.name}.${Drawable.count++}`,
-            mode: gl.TRIANGLES,
-            vertexShader: GPGPU.planeVertexShader,
-            fragmentShader: GPGPU.planeFragmentShader,
-            args: mesh,
-            VertexIndexBuffer: new Uint16Array(vertexIndices)
-        });
     }
 }
 
@@ -749,7 +746,12 @@ export class Label extends Drawable {
     }
 
     constructor(text: string, box: Box){
-        super();
+        super({
+            id: `label${Drawable.count++}`,
+            mode: gl.TRIANGLES,
+            vertexShader: GPGPU.planeTextureVertexShader,//.textureSphereVertexShader,
+            fragmentShader: GPGPU.planeTextureFragmentShader,//defaultFragmentShader,
+        });
 
         if(Label.texInf == undefined){
 
@@ -821,24 +823,15 @@ export class Label extends Drawable {
 
             posX += halfFull * halfColWidth;
         }
-    
-        let mesh = {
+
+        this.VertexIndexBuffer = new Uint16Array(vertexIndices);
+        
+        this.args = {
             vertexPosition: new Float32Array(vertices),
             vertexNormal: new Float32Array(vertexNormals),
             textureCoord: new Float32Array(textureCoords),
             textureImage: new TextureInfo(null, null, Label.canvas)
         } as Mesh;
-        
-    
-        this.package = new Package({
-            id: `label${Drawable.count++}`,
-            mode: gl.TRIANGLES,
-            vertexShader: GPGPU.planeTextureVertexShader,//.textureSphereVertexShader,
-            fragmentShader: GPGPU.planeTextureFragmentShader,//defaultFragmentShader,
-            args: mesh,
-            VertexIndexBuffer: new Uint16Array(vertexIndices)
-        });
-
     }
 }
 
@@ -847,28 +840,27 @@ export class ImageDrawable extends Drawable {
     img: HTMLImageElement;
 
     constructor(src: string, fnc: (ev: Event)=>any) {
-        super();
+        super({
+            id: "Earth",
+            mode: gl.TRIANGLES,
+            vertexShader: GPGPU.textureSphereVertexShader,
+            fragmentShader: GPGPU.defaultFragmentShader,
+        });
         this.img = new Image();
         this.img.onload = fnc;
         this.img.src = src;
     }
 
     getParam() {
-        if (!this.package) {
+        if (!this.args) {
 
             var [mesh, idx_array] = makePlaneBuffers(new Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new TextureInfo(null, null, this.img));
 
-            this.package = new Package({
-                id: "Earth",
-                mode: gl.TRIANGLES,
-                vertexShader: GPGPU.textureSphereVertexShader,
-                fragmentShader: GPGPU.defaultFragmentShader,
-                args: mesh,
-                VertexIndexBuffer: idx_array
-            });
+            this.args = mesh;
+            this.VertexIndexBuffer = idx_array;
         }
 
-        return this.package;
+        return this;
     }
 }
 

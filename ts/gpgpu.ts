@@ -105,9 +105,7 @@ export class Color {
     }
 }
 
-export class Drawable {
-    static count = 0;
-    package!: Package;
+export class AbsDrawable {
     transform: Float32Array;
 
     constructor(){
@@ -115,143 +113,24 @@ export class Drawable {
         mat4.identity(this.transform);
     }
 
-    getVertexColors(color: Color, numVertex: number) : number[] {
-        let vertexColors: number[] = [];
-
-        range(numVertex).forEach(x => {
-            vertexColors.push(color.r, color.g, color.b, color.a);
-        });
-
-        return vertexColors;
-    }
-
-    move(x: number, y: number, z: number) : Drawable {
+    move(x: number, y: number, z: number) : AbsDrawable {
         mat4.translate(this.transform, [x, y, z]);
 
         return this;
     }
 
-    scale(x: number, y: number, z: number) : Drawable {
+    scale(x: number, y: number, z: number) : AbsDrawable {
         mat4.scale(this.transform, [x, y, z]);
 
         return this;
     }
-    
-    getParam() {
-        return this.package;
+
+    clear(){
+        throw new Error();
     }
 }
 
-
-export class Points extends Drawable {
-    constructor(points: Float32Array, colors: Float32Array, pointSize: number){
-        super();
-    
-        let mesh = {
-            vertexPosition: points,
-            vertexColor: colors,
-            pointSize  : pointSize
-        } as any as Mesh;
-            
-        this.package = new Package({
-            id: `${this.constructor.name}.${Drawable.count++}`,
-            mode: gl.POINTS,
-            vertexShader: VertexShader.points,
-            fragmentShader: GPGPU.pointFragmentShader,
-            args: mesh,
-            VertexIndexBuffer: new Uint16Array(range(points.length / 3))
-        });
-    }
-
-    makeVertexPosition(vertices: Vertex[]) : Float32Array {
-        const positions = new Float32Array(3 * vertices.length);
-
-        let base = 0;
-        for(let i = 0; i < vertices.length; i++){
-            let p = vertices[i];
-            positions[base    ] = p.x;
-            positions[base + 1] = p.y;
-            positions[base + 2] = p.z;
-
-            base += 3;
-        }
-
-        return positions;
-    }
-
-    update(points: Float32Array, color: Color, pointSize: number){
-        // 色の配列
-        let vertexColors = this.getVertexColors(color, points.length / 3);
-    
-        let mesh = this.package.args as Mesh;
-        mesh.vertexPosition = points;
-        mesh.vertexColor = new Float32Array(vertexColors);
-        mesh.pointSize = pointSize;
-
-        this.package.VertexIndexBuffer = new Uint16Array(range(points.length / 3));
-    }
-}
-
-
-export class Lines extends Drawable {
-    constructor(vertices: Vertex[], color: Color){
-        super();
-    
-        // 色の配列
-        let vertexColors = this.getVertexColors(color, vertices.length);
-    
-        const positions : number[] = [];
-        vertices.forEach(p => positions.push(p.x, p.y, p.z));
-
-        let mesh = {
-            vertexPosition: new Float32Array(positions),
-            vertexColor: new Float32Array(vertexColors),
-        } as any as Mesh;
-            
-        this.package = new Package({
-            id: `${this.constructor.name}.${Drawable.count++}`,
-            mode: gl.LINES,
-            vertexShader: VertexShader.lines,
-            fragmentShader: GPGPU.pointFragmentShader,
-            args: mesh,
-            VertexIndexBuffer: new Uint16Array(range(vertices.length))
-        });
-    }
-}
-
-export class ComponentDrawable extends Drawable {
-    children: Drawable[];
-
-    constructor(children: Drawable[]){
-        super();
-        this.children = children.slice();
-    }
-}
-
-export class UserDef extends Drawable {
-    constructor(mode: GLenum,  vertexShader: string, fragmentShader: string, args: any = {}){
-        super();
-
-        this.package = new Package({
-            id: `${this.constructor.name}.${Drawable.count++}`,
-            mode: mode,
-            vertexShader: vertexShader,
-            fragmentShader: fragmentShader,
-            args: args
-        });
-    }
-}
-
-export class UserMesh extends UserDef {
-    constructor(mode: GLenum, vertexShader: string, fragmentShader: string, numInput: number, numGroup: number | undefined = undefined){
-        super(mode, vertexShader, fragmentShader);
-        this.package.numInput = numInput;
-        this.package.numGroup  = numGroup;
-    }
-}
-
-
-export class Package{
+export class Package extends AbsDrawable{
     id!: string;
     mode!: GLenum;
     vertexShader!: string;
@@ -275,6 +154,7 @@ export class Package{
     time: number = 0;
 
     constructor(obj: any = undefined){
+        super();
         if(obj != undefined){
             Object.assign(this, obj);
         }
@@ -326,6 +206,138 @@ export class Package{
         gl.deleteProgram(this.program!); chk();
     }
 }
+
+export class Drawable extends Package {
+    static count = 0;
+
+    constructor(obj: any = undefined){
+        super(obj);
+    }
+
+    getVertexColors(color: Color, numVertex: number) : number[] {
+        let vertexColors: number[] = [];
+
+        range(numVertex).forEach(x => {
+            vertexColors.push(color.r, color.g, color.b, color.a);
+        });
+
+        return vertexColors;
+    }
+    
+    getParam() {
+        return this;
+    }
+}
+
+
+export class Points extends Drawable {
+    constructor(points: Float32Array, colors: Float32Array, pointSize: number){
+        super({
+            mode: gl.POINTS,
+            vertexShader: VertexShader.points,
+            fragmentShader: GPGPU.pointFragmentShader,
+            args: {
+                vertexPosition: points,
+                vertexColor: colors,
+                pointSize  : pointSize
+            } as any as Mesh,
+            VertexIndexBuffer: new Uint16Array(range(points.length / 3))
+        });
+
+        this.id = `${this.constructor.name}.${Drawable.count++}`;
+    }
+
+    makeVertexPosition(vertices: Vertex[]) : Float32Array {
+        const positions = new Float32Array(3 * vertices.length);
+
+        let base = 0;
+        for(let i = 0; i < vertices.length; i++){
+            let p = vertices[i];
+            positions[base    ] = p.x;
+            positions[base + 1] = p.y;
+            positions[base + 2] = p.z;
+
+            base += 3;
+        }
+
+        return positions;
+    }
+
+    updateNotUsed(points: Float32Array, color: Color, pointSize: number){
+        // 色の配列
+        let vertexColors = this.getVertexColors(color, points.length / 3);
+    
+        let mesh = this.args as Mesh;
+        mesh.vertexPosition = points;
+        mesh.vertexColor = new Float32Array(vertexColors);
+        mesh.pointSize = pointSize;
+
+        this.VertexIndexBuffer = new Uint16Array(range(points.length / 3));
+    }
+}
+
+export class Lines extends Drawable {
+    constructor(vertices: Vertex[], color: Color){
+        super({
+            mode: gl.LINES,
+            vertexShader: VertexShader.lines,
+            fragmentShader: GPGPU.pointFragmentShader,
+            VertexIndexBuffer: new Uint16Array(range(vertices.length))
+        });
+
+        this.id = `${this.constructor.name}.${Drawable.count++}`;
+        
+        // 色の配列
+        let vertexColors = this.getVertexColors(color, vertices.length);
+    
+        const positions : number[] = [];
+        vertices.forEach(p => positions.push(p.x, p.y, p.z));
+
+        this.args = {
+            vertexPosition: new Float32Array(positions),
+            vertexColor: new Float32Array(vertexColors),
+        } as any as Mesh;
+    }
+}
+
+
+export class ComponentDrawable extends AbsDrawable {
+    children: AbsDrawable[];
+
+    constructor(children: AbsDrawable[]){
+        super();
+        this.children = children.slice();
+    }
+
+    clear(){
+        for(let pkg of this.children){
+            pkg.clear();
+        }
+    }
+}
+
+export class UserDef extends Drawable {
+    constructor(mode: GLenum,  vertexShader: string, fragmentShader: string, args: any = {}){
+        super({
+            mode: mode,
+            vertexShader: vertexShader,
+            fragmentShader: fragmentShader,
+            args: args
+        });
+
+        this.id = `${this.constructor.name}.${Drawable.count++}`;
+    }
+}
+
+export class UserMesh extends UserDef {
+    constructor(mode: GLenum, vertexShader: string, fragmentShader: string, numInput: number, numGroup: number | undefined = undefined){
+        super(mode, vertexShader, fragmentShader);
+        this.numInput = numInput;
+        this.numGroup  = numGroup;
+    }
+}
+
+
 
 /*
     テクスチャ情報
@@ -669,7 +681,7 @@ export class GPGPU {
     canvas: HTMLCanvasElement;
     TEXTUREs: number[];
     packages: Package[] = [];
-    drawables: Drawable[] = [];
+    drawables: AbsDrawable[] = [];
     drawParam: DrawParam = new DrawParam(0, 0, 0, 0, -5.0);;
     ui3D : UI3D;
 
@@ -1291,7 +1303,7 @@ export class GPGPU {
     /*
         計算します。
     */
-    compute(pkg: Package, drawable: Drawable | undefined = undefined) {
+    compute(pkg: Package) {
         if (pkg.program == undefined) {
             // パッケージが未作成の場合
 
@@ -1434,7 +1446,7 @@ export class GPGPU {
     setStandardShaderString() {
     }
 
-    draw(drawable: Drawable, worldMat: Float32Array, viewMat: Float32Array, projMat: Float32Array){
+    draw(drawable: AbsDrawable, worldMat: Float32Array, viewMat: Float32Array, projMat: Float32Array){
 
         let modelMat = mat4.create();
         mat4.multiply(worldMat, drawable.transform, modelMat);
@@ -1447,6 +1459,10 @@ export class GPGPU {
                 this.draw(child, modelMat, viewMat, projMat)
             }
             return;
+        }
+        else if(!(drawable instanceof Drawable)){
+
+            throw new Error();
         }
 
         let pkg = drawable.getParam();
@@ -1477,7 +1493,7 @@ export class GPGPU {
                 pkg.args["tick"]++;
             }
 
-            this.compute(pkg, drawable);
+            this.compute(pkg);
         }
     }
 
@@ -1522,7 +1538,7 @@ export class GPGPU {
     /*
         3D表示を開始します。
     */
-    startDraw3D(drawables: Drawable[]) {
+    startDraw3D(drawables: AbsDrawable[]) {
         this.drawables = drawables;
 
         // pointerdownのイベント リスナーを登録する。

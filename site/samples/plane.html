@@ -10,44 +10,31 @@
 <script src="../js/shape.js?ver=1" ></script>
 
 <script>
-class MyDraw {
-    constructor() {
-        this.transform = mat4.create();
-        mat4.identity(this.transform);
+function bodyOnload(){
+    let img = new Image();
 
-        this.img = new Image();
+    img.onload = function () {
+        var canvas = document.getElementById("webgl-canvas");
+        let gpgpu = gpgputs.CreateGPGPU(canvas);
 
-        this.img.onload = function () {
-            var canvas = document.getElementById("webgl-canvas");
-            this.MyWebGL = gpgputs.CreateGPGPU(canvas);
-            this.MyWebGL.startDraw3D([this]);
-        }.bind(this);
+        var [mesh, idx_array] = gpgputs.makePlaneBuffers(new gpgputs.Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new gpgputs.TextureInfo(null, null, img));
 
-        this.img.src = "../img/world.topo.bathy.200408.2048x2048.png";
-    }
+        let dr = new gpgputs.UserDef(
+            gpgputs.gl.TRIANGLES, 
+            gpgputs.GPGPU.textureSphereVertexShader, 
+            gpgputs.GPGPU.defaultFragmentShader, 
+            mesh);
+        dr.id = "Earth";
+        dr.VertexIndexBuffer = idx_array;
 
-    getParam() {
-        if (!this.package) {
+        gpgpu.startDraw3D([dr]);
+    };
 
-            var [mesh, idx_array] = gpgputs.makePlaneBuffers(new gpgputs.Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new gpgputs.TextureInfo(null, null, this.img));
-
-            this.package = new gpgputs.Package({
-                id: "Earth",
-                mode: gpgputs.gl.TRIANGLES,
-                vertexShader: gpgputs.GPGPU.textureSphereVertexShader,
-                fragmentShader: gpgputs.GPGPU.defaultFragmentShader,
-                args: mesh,
-                VertexIndexBuffer: idx_array
-            });
-        }
-
-        return this.package;
-    }
+    img.src = "../img/world.topo.bathy.200408.2048x2048.png";
 }
-
 </script>
 </head>
-<body onload="new MyDraw()">
+<body onload="bodyOnload()">
     <a href="test.html"">次</a>
     <canvas id="webgl-canvas" style="border: none;" width="500" height="500"></canvas>
 </body>
