@@ -1506,7 +1506,7 @@ export class GPGPU {
         mat4.rotate(viewMat, this.drawParam.yRot, [0, 1, 0]);
 
         let projMat = mat4.create();
-        mat4.perspective(45, this.canvas.offsetWidth / this.canvas.offsetHeight, 0.1, 100.0, projMat);
+        mat4.perspective(45, this.canvas.offsetWidth / this.canvas.offsetHeight, 0.1, 1000.0, projMat);
 
         for(let drawable of this.drawables){
 
