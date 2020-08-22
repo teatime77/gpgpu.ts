@@ -534,178 +534,176 @@ export class UI3D {
 */
 export class GPGPU {
     static readonly textureSphereVertexShader = `
+const vec3 uAmbientColor = vec3(0.2, 0.2, 0.2);
+const vec3 uLightingDirection =  normalize( vec3(0.25, 0.25, 1) );
+const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
 
-        const vec3 uAmbientColor = vec3(0.2, 0.2, 0.2);
-        const vec3 uLightingDirection =  normalize( vec3(0.25, 0.25, 1) );
-        const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
+// 位置
+in vec3 vertexPosition;
 
-        // 位置
-        in vec3 vertexPosition;
+// 法線
+in vec3 vertexNormal;
 
-        // 法線
-        in vec3 vertexNormal;
+// テクスチャ座標
+in vec2 textureCoord;
 
-        // テクスチャ座標
-        in vec2 textureCoord;
+uniform mat4 uPMVMatrix;
+uniform mat3 uNMatrix;
 
-        uniform mat4 uPMVMatrix;
-        uniform mat3 uNMatrix;
+out vec3 vLightWeighting;
 
-        out vec3 vLightWeighting;
+out vec2 uv0;
+out vec2 uv1;
 
-        out vec2 uv0;
-        out vec2 uv1;
+void main(void) {
+    gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
 
-        void main(void) {
-            gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
+    vec3 transformedNormal = uNMatrix * vertexNormal;
+    float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
+    vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
 
-            vec3 transformedNormal = uNMatrix * vertexNormal;
-            float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
-            vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
-
-            uv0 = fract( textureCoord.st );
-            uv1 = fract( textureCoord.st + vec2(0.5,0.5) ) - vec2(0.5,0.5);
-        }
-    `;
+    uv0 = fract( textureCoord.st );
+    uv1 = fract( textureCoord.st + vec2(0.5,0.5) ) - vec2(0.5,0.5);
+}
+`;
 
     // GPGPU用のフラグメントシェーダ。(何も処理はしない。)
-    static readonly minFragmentShader =
-        `out vec4 color;
+    static readonly minFragmentShader = `
+out vec4 color;
 
-        void main(){
-            color = vec4(1.0);
-        }`;
+void main(){
+    color = vec4(1.0);
+}
+`;
 
     // デフォルトの動作のフラグメントシェーダ
-    static readonly defaultFragmentShader =
-        `in vec3 vLightWeighting;
-        in vec2 uv0;
-        in vec2 uv1;
+    static readonly defaultFragmentShader = `
+in vec3 vLightWeighting;
+in vec2 uv0;
+in vec2 uv1;
 
-        uniform sampler2D textureImage;
+uniform sampler2D textureImage;
 
-        out vec4 color;
+out vec4 color;
 
-        void main(void) {
-            vec2 uvT;
+void main(void) {
+    vec2 uvT;
 
-            uvT.x = ( fwidth( uv0.x ) < fwidth( uv1.x )-0.001 ) ? uv0.x : uv1.x ;
-            uvT.y = ( fwidth( uv0.y ) < fwidth( uv1.y )-0.001 ) ? uv0.y : uv1.y ;
+    uvT.x = ( fwidth( uv0.x ) < fwidth( uv1.x )-0.001 ) ? uv0.x : uv1.x ;
+    uvT.y = ( fwidth( uv0.y ) < fwidth( uv1.y )-0.001 ) ? uv0.y : uv1.y ;
 
-            vec4 textureColor = texture(textureImage, uvT);
+    vec4 textureColor = texture(textureImage, uvT);
 
-            color = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
-        }
-        `;
+    color = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
+}
+`;
 
         static readonly planeTextureVertexShader = `
+const vec3 uAmbientColor = vec3(0.2, 0.2, 0.2);
+const vec3 uLightingDirection =  normalize( vec3(0.25, 0.25, 1) );
+const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
 
-        const vec3 uAmbientColor = vec3(0.2, 0.2, 0.2);
-        const vec3 uLightingDirection =  normalize( vec3(0.25, 0.25, 1) );
-        const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
+// 位置
+in vec3 vertexPosition;
 
-        // 位置
-        in vec3 vertexPosition;
+// 法線
+in vec3 vertexNormal;
 
-        // 法線
-        in vec3 vertexNormal;
+// テクスチャ座標
+in vec2 textureCoord;
 
-        // テクスチャ座標
-        in vec2 textureCoord;
+uniform mat4 uPMVMatrix;
+uniform mat3 uNMatrix;
 
-        uniform mat4 uPMVMatrix;
-        uniform mat3 uNMatrix;
+out vec3 vLightWeighting;
 
-        out vec3 vLightWeighting;
+out vec2 uv;
 
-        out vec2 uv;
+void main(void) {
+    gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
 
-        void main(void) {
-            gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
+    vec3 transformedNormal = uNMatrix * vertexNormal;
+    float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
+    vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
 
-            vec3 transformedNormal = uNMatrix * vertexNormal;
-            float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
-            vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
+    uv = textureCoord;
+}
+`;
 
-            uv = textureCoord;
-        }
-    `;
+    static readonly planeTextureFragmentShader = `
+in vec3 vLightWeighting;
+in vec2 uv;
 
-    static readonly planeTextureFragmentShader =
-        `in vec3 vLightWeighting;
-        in vec2 uv;
+uniform sampler2D textureImage;
 
-        uniform sampler2D textureImage;
+out vec4 color;
 
-        out vec4 color;
+void main(void) {
+    vec4 textureColor = texture(textureImage, uv);
 
-        void main(void) {
-            vec4 textureColor = texture(textureImage, uv);
-
-            color = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
-        }
-        `;
+    color = vec4(textureColor.rgb * vLightWeighting, textureColor.a);
+}
+`;
 
         static readonly planeVertexShader = `
+const vec3 uAmbientColor = vec3(0.2, 0.2, 0.2);
+const vec3 uLightingDirection =  normalize( vec3(0.25, 0.25, 1) );
+const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
 
-        const vec3 uAmbientColor = vec3(0.2, 0.2, 0.2);
-        const vec3 uLightingDirection =  normalize( vec3(0.25, 0.25, 1) );
-        const vec3 uDirectionalColor = vec3(0.8, 0.8, 0.8);
+// 位置
+in vec3 vertexPosition;
 
-        // 位置
-        in vec3 vertexPosition;
+// 法線
+in vec3 vertexNormal;
 
-        // 法線
-        in vec3 vertexNormal;
+// 色
+in vec4 vertexColor;
 
-        // 色
-        in vec4 vertexColor;
+uniform mat4 uPMVMatrix;
+uniform mat3 uNMatrix;
 
-        uniform mat4 uPMVMatrix;
-        uniform mat3 uNMatrix;
+out vec3 vLightWeighting;
 
-        out vec3 vLightWeighting;
+// 色
+out vec4 fragmentColor;
 
-        // 色
-        out vec4 fragmentColor;
+void main(void) {
+    gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
 
-        void main(void) {
-            gl_Position = uPMVMatrix * vec4(vertexPosition, 1.0);
-
-            vec3 transformedNormal = uNMatrix * vertexNormal;
-            float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
-            vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
-            fragmentColor = vertexColor;
-        }
-    `;
+    vec3 transformedNormal = uNMatrix * vertexNormal;
+    float directionalLightWeighting = max(dot(transformedNormal, uLightingDirection), 0.0);
+    vLightWeighting = uAmbientColor +uDirectionalColor * directionalLightWeighting;
+    fragmentColor = vertexColor;
+}
+`;
 
     static readonly planeFragmentShader =
-        `in vec3 vLightWeighting;
+`in vec3 vLightWeighting;
 
-        in vec4 fragmentColor;
+in vec4 fragmentColor;
 
-        out vec4 color;
+out vec4 color;
 
-        void main(void) {
-            color = vec4(fragmentColor.rgb * vLightWeighting, fragmentColor.a);
-        }
-        `;
+void main(void) {
+    color = vec4(fragmentColor.rgb * vLightWeighting, fragmentColor.a);
+}
+`;
 
     static readonly pointFragmentShader = `
-        in  vec4 fragmentColor;
-        out vec4 color;
+in  vec4 fragmentColor;
+out vec4 color;
 
-        void main(void) {
-            color = fragmentColor;
-        }
-        `;
+void main(void) {
+    color = fragmentColor;
+}
+`;
 
     static readonly vertexPositionShader = `
-        in vec3 in_position;
-                
-        void main(void) {
-            gl_Position = vec4(in_position, 1.0);
-        }`;
+in vec3 in_position;
+        
+void main(void) {
+    gl_Position = vec4(in_position, 1.0);
+}`;
 
     canvas: HTMLCanvasElement;
     TEXTUREs: number[];
