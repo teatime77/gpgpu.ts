@@ -153,7 +153,10 @@ export class AbsDrawable {
 }
 
 export class Package extends AbsDrawable{
+    static count = 0;
+
     id!: string;
+    shape: number[] = [];
     mode!: GLenum;
     vertexShader!: string;
     fragmentShader: string = GPGPU.minFragmentShader;
@@ -181,6 +184,10 @@ export class Package extends AbsDrawable{
             Object.assign(this, obj);
         }
         console.assert(this.mode != undefined);
+
+        if(this.id == undefined){
+            this.id = `${this.constructor.name}_${Package.count++}`;
+        }
     }
 
     bind(outName: string, inName: string, inPackage: Package | undefined = undefined){
@@ -227,11 +234,13 @@ export class Package extends AbsDrawable{
         // プログラムを削除する。
         gl.deleteProgram(this.program!); chk();
     }
+
+    setShape(shape: number[]){
+        this.shape = shape;
+    }
 }
 
 export class Drawable extends Package {
-    static count = 0;
-
     constructor(obj: any = undefined){
         super(obj);
     }
@@ -266,7 +275,7 @@ export class Points extends Drawable {
             VertexIndexBuffer: new Uint16Array(range(points.length / 3))
         });
 
-        this.id = `${this.constructor.name}.${Drawable.count++}`;
+        this.id = `${this.constructor.name}.${Package.count++}`;
     }
 
     makeVertexPosition(vertices: Vertex[]) : Float32Array {
@@ -307,7 +316,7 @@ export class Lines extends Drawable {
             VertexIndexBuffer: new Uint16Array(range(vertices.length))
         });
 
-        this.id = `${this.constructor.name}.${Drawable.count++}`;
+        this.id = `${this.constructor.name}.${Package.count++}`;
         
         // 色の配列
         let vertexColors = this.getVertexColors(color, vertices.length);
@@ -346,8 +355,6 @@ export class UserDef extends Drawable {
             fragmentShader: fragmentShader,
             args: args
         });
-
-        this.id = `${this.constructor.name}.${Drawable.count++}`;
     }
 }
 
@@ -782,6 +789,10 @@ void main(void) {
         }
 
         this.packages = [];
+
+        while(this.drawables.length != 0){
+            this.drawables.pop()!.clear();
+        }
     }
 
     /*
