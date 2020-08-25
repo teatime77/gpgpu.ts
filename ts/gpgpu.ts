@@ -39,7 +39,7 @@ export function chk() {
     /*
         ベクトルの次元を返します。
     */
-function vecDim(tp: string) : number {
+export function vecDim(tp: string) : number {
     if (tp == "vec4") {
         return 4;
     }
@@ -238,6 +238,9 @@ export class Package extends AbsDrawable{
     setShape(shape: number[]){
         this.shape = shape;
     }
+    
+    ready() {
+    }
 }
 
 export class Drawable extends Package {
@@ -253,10 +256,6 @@ export class Drawable extends Package {
         });
 
         return vertexColors;
-    }
-    
-    getParam() {
-        return this;
     }
 }
 
@@ -390,6 +389,9 @@ export class TextureInfo {
     */
     constructor(texel_type: string | null, shape: number[] | null, value: TextureValue | undefined = undefined) {
         console.assert(texel_type != null || value != undefined && !(value instanceof Float32Array));
+        if(shape != null){
+            console.assert(shape.length == 2 || shape.length == 3);
+        }
 
         if(value == undefined){
             let dim = vecDim(texel_type!);
@@ -1485,41 +1487,35 @@ void main(void) {
             }
             return;
         }
-        else if(!(drawable instanceof Drawable)){
 
-            throw new Error();
+        let pkg = drawable as Package;
+        pkg.ready();
+
+        let msec = (new Date()).getTime();
+        if(pkg.fps != 0 && msec - pkg.time < 1000 / pkg.fps){
+            return;
+        }
+        pkg.time = msec;
+
+        let projViewModelMat = mat4.create();
+        mat4.multiply(projMat, viewModelMat, projViewModelMat);
+
+        let normalMatrix = mat3.create();
+        mat4.toInverseMat3(viewMat, normalMatrix);
+        mat3.transpose(normalMatrix);
+
+
+        pkg.args["uPMVMatrix"] = projViewModelMat;
+        pkg.args["uNMatrix"] = normalMatrix;
+
+        if(pkg.args["tick"] == undefined){
+            pkg.args["tick"] = 0;
+        }
+        else{
+            pkg.args["tick"]++;
         }
 
-        let pkg = drawable.getParam();
-
-        if(pkg != null){
-
-            let msec = (new Date()).getTime();
-            if(pkg.fps != 0 && msec - pkg.time < 1000 / pkg.fps){
-                return;
-            }
-            pkg.time = msec;
-
-            let projViewModelMat = mat4.create();
-            mat4.multiply(projMat, viewModelMat, projViewModelMat);
-
-            let normalMatrix = mat3.create();
-            mat4.toInverseMat3(viewMat, normalMatrix);
-            mat3.transpose(normalMatrix);
-
-
-            pkg.args["uPMVMatrix"] = projViewModelMat;
-            pkg.args["uNMatrix"] = normalMatrix;
-
-            if(pkg.args["tick"] == undefined){
-                pkg.args["tick"] = 0;
-            }
-            else{
-                pkg.args["tick"]++;
-            }
-
-            this.compute(pkg);
-        }
+        this.compute(pkg);
     }
 
     /*

@@ -851,7 +851,7 @@ export class ImageDrawable extends Drawable {
         this.img.src = src;
     }
 
-    getParam() {
+    ready() {
         if (!this.args) {
 
             var [mesh, idx_array] = makePlaneBuffers(new Box(-1, -0.5, -1, -0.5, 0, 0), 11, 11, new TextureInfo(null, null, this.img));
@@ -859,8 +859,6 @@ export class ImageDrawable extends Drawable {
             this.args = mesh;
             this.VertexIndexBuffer = idx_array;
         }
-
-        return this;
     }
 }
 
