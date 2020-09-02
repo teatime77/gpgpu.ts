@@ -52,11 +52,41 @@ export function vecDim(tp: string) : number {
     else if(tp == "float"){
         return 1;
     }
+    else if(tp == "mat3"){
+        return 3 * 3;
+    }
+    else if(tp == "mat4"){
+        return 4 * 4;
+    }
     else{
         throw new Error();
     }
 }
 
+export function getDrawMode(mode: string) : number{
+    switch(mode){
+    case "POINTS"        : return gl.POINTS;
+    case "LINES"         : return gl.LINES;
+    case "TRIANGLES"     : return gl.TRIANGLES;
+    case "TRIANGLE_FAN"  : return gl.TRIANGLE_FAN;
+    case "TRIANGLE_STRIP": return gl.TRIANGLE_STRIP;
+    }
+
+    throw new Error();
+}
+
+
+export function getDrawModeText(mode: number) : string{
+    switch(mode){
+    case gl.POINTS        : return "POINTS";
+    case gl.LINES         : return "LINES";
+    case gl.TRIANGLES     : return "TRIANGLES";
+    case gl.TRIANGLE_FAN  : return "TRIANGLE_FAN";
+    case gl.TRIANGLE_STRIP: return "TRIANGLE_STRIP";
+    }
+
+    throw new Error();
+}
 
 export class Vec3 {
     x: number;
@@ -82,6 +112,26 @@ export class Vec3 {
         else{
             return new Vec3(this.x / len, this.y / len, this.z / len);
         }
+    }
+
+    mul(n: number){
+        return new Vec3(n * this.x, n * this.y, n * this.z);
+    }
+
+    add(v: Vec3) {
+        return new Vec3( this.x + v.x, this.y + v.y, this.z + v.z );
+    }
+
+    sub(v: Vec3) {
+        return new Vec3( this.x - v.x, this.y - v.y, this.z - v.z );
+    }
+    
+    dot(v: Vec3) {
+        return this.x * v.x + this.y * v.y + this.z * v.z;
+    }
+    
+    cross(v: Vec3) {
+        return new Vec3(this.y * v.z - this.z * v.y, this.z * v.x - this.x * v.z, this.x * v.y - this.y * v.x);
     }
 }
 
@@ -156,10 +206,11 @@ export class Package extends AbsDrawable{
     static count = 0;
 
     id!: string;
-    shape: number[] = [];
+    numInput: number | undefined;
     mode!: GLenum;
     vertexShader!: string;
     fragmentShader: string = GPGPU.minFragmentShader;
+
     args: Mesh;
     VertexIndexBuffer: Uint16Array | Uint32Array | undefined;
 
@@ -168,7 +219,6 @@ export class Package extends AbsDrawable{
 
     vertexIndexBufferInf: WebGLBuffer | undefined;
     textures: TextureInfo[] = [];
-    numInput: number | undefined;
     numGroup: number | undefined;
     varyings: ArgInf[] = [];
     attributes: ArgInf[] = [];
@@ -233,10 +283,6 @@ export class Package extends AbsDrawable{
 
         // プログラムを削除する。
         gl.deleteProgram(this.program!); chk();
-    }
-
-    setShape(shape: number[]){
-        this.shape = shape;
     }
     
     ready() {
@@ -959,7 +1005,7 @@ void main(void) {
         // フラグメントシェーダをアタッチする。
         gl.attachShader(prg, fragment_shader); chk();
 
-        if (varyings) {
+        if (varyings.length != 0) {
             // varying変数がある場合
 
             // varying変数の名前の配列
