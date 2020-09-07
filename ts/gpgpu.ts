@@ -584,6 +584,11 @@ export class UI3D {
     }
 }
 
+export interface DrawScenelistener {
+    beforeDraw() : void;
+    afterDraw()  : void;
+}
+
 /*
     GPGPUのメインのクラス
 */
@@ -766,6 +771,7 @@ void main(void) {
     drawables: AbsDrawable[] = [];
     drawParam: DrawParam = new DrawParam(0, 0, 0, 0, -5.0);
     ui3D : UI3D;
+    drawScenelistener : DrawScenelistener | null = null;
 
     /*
         GPGPUのコンストラクタ
@@ -1591,11 +1597,19 @@ void main(void) {
         let projMat = mat4.create();
         mat4.perspective(45, this.canvas.offsetWidth / this.canvas.offsetHeight, 0.1, 1000.0, projMat);
 
+        if(this.drawScenelistener != null){
+            this.drawScenelistener.beforeDraw();
+        }
+
         for(let drawable of this.drawables){
 
             let worldMat = mat4.create();
             mat4.identity(worldMat);
             this.draw(drawable, worldMat, viewMat, projMat);
+        }
+
+        if(this.drawScenelistener != null){
+            this.drawScenelistener.afterDraw();
         }
 
         // 次の再描画でdrawSceneが呼ばれるようにする。
