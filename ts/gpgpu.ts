@@ -1,7 +1,19 @@
 ﻿namespace gpgputs {
 
-declare let mat4:any;
-declare let mat3:any;
+declare namespace mat4 {
+    function create() : Float32Array;
+    function translate(out: Float32Array, a: Float32Array, v: [number, number, number]) : void;
+    function rotateX(out : Float32Array, a : Float32Array, rad : number) : Float32Array;
+    function rotateY(out : Float32Array, a : Float32Array, rad : number) : Float32Array;
+    function scale(out : Float32Array, a : Float32Array, v : [number, number, number]) : Float32Array;
+    function multiply(out : Float32Array, a : Float32Array, b : Float32Array) : Float32Array;
+    function perspective(out : Float32Array, fovy : number, aspect : number, near : number, far : number) : Float32Array;
+}
+
+declare namespace mat3 {
+    function create() : Float32Array;
+    function normalFromMat4(out : Float32Array, a : Float32Array) : Float32Array;
+}
 
 type TextureValue = Float32Array | HTMLImageElement | HTMLCanvasElement;
 export type Mesh = any;
@@ -182,17 +194,16 @@ export class AbsDrawable {
 
     constructor(){
         this.transform = mat4.create();
-        mat4.identity(this.transform);
     }
 
     move(x: number, y: number, z: number) : AbsDrawable {
-        mat4.translate(this.transform, [x, y, z]);
+        mat4.translate(this.transform, this.transform, [x, y, z]);
 
         return this;
     }
 
     scale(x: number, y: number, z: number) : AbsDrawable {
-        mat4.scale(this.transform, [x, y, z]);
+        mat4.scale(this.transform, this.transform, [x, y, z]);
 
         return this;
     }
@@ -586,7 +597,7 @@ export class UI3D {
 
 export interface DrawScenelistener {
     beforeDraw() : void;
-    afterDraw()  : void;
+    afterDraw(projViewMat: Float32Array)  : void;
 }
 
 /*
@@ -1528,10 +1539,10 @@ void main(void) {
     draw(drawable: AbsDrawable, worldMat: Float32Array, viewMat: Float32Array, projMat: Float32Array){
 
         let modelMat = mat4.create();
-        mat4.multiply(worldMat, drawable.transform, modelMat);
+        mat4.multiply(modelMat, worldMat, drawable.transform);
 
         let viewModelMat = mat4.create();
-        mat4.multiply(viewMat, modelMat, viewModelMat);
+        mat4.multiply(viewModelMat, viewMat, modelMat);
 
         if(drawable instanceof ComponentDrawable){
             for(let child of drawable.children){
@@ -1550,11 +1561,12 @@ void main(void) {
         pkg.time = msec;
 
         let projViewModelMat = mat4.create();
-        mat4.multiply(projMat, viewModelMat, projViewModelMat);
+        mat4.multiply(projViewModelMat, projMat, viewModelMat);
 
         let normalMatrix = mat3.create();
-        mat4.toInverseMat3(viewMat, normalMatrix);
-        mat3.transpose(normalMatrix);
+        mat3.normalFromMat4(normalMatrix, viewMat);
+        // mat4.toInverseMat3(viewMat, normalMatrix);
+        // mat3.transpose(normalMatrix);
 
 
         pkg.args["uPMVMatrix"] = projViewModelMat;
@@ -1574,6 +1586,12 @@ void main(void) {
         3D表示をします。
     */
     drawScene() {
+        if(this.drawables.length == 0){
+
+            window.requestAnimationFrame(this.drawScene.bind(this));
+            return;
+        }
+
         gl.clearColor(1, 248/255, 220/255, 1); chk();   // cornsilk
         gl.clearDepth(1.0); chk();                      // Clear everything
         
@@ -1587,15 +1605,14 @@ void main(void) {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); chk();
 
         let viewMat = mat4.create();
-        mat4.identity(viewMat);
 
-        mat4.translate(viewMat, [this.drawParam.x, this.drawParam.y, this.drawParam.z]);
+        mat4.translate(viewMat, viewMat, [this.drawParam.x, this.drawParam.y, this.drawParam.z]);
 
-        mat4.rotate(viewMat, this.drawParam.xRot, [1, 0, 0]);
-        mat4.rotate(viewMat, this.drawParam.yRot, [0, 1, 0]);
+        mat4.rotateX(viewMat, viewMat, this.drawParam.xRot);
+        mat4.rotateY(viewMat, viewMat, this.drawParam.yRot);
 
         let projMat = mat4.create();
-        mat4.perspective(45, this.canvas.offsetWidth / this.canvas.offsetHeight, 0.1, 1000.0, projMat);
+        mat4.perspective(projMat, 45 * Math.PI / 180, this.canvas.offsetWidth / this.canvas.offsetHeight, 0.1, 1000.0);
 
         if(this.drawScenelistener != null){
             this.drawScenelistener.beforeDraw();
@@ -1604,12 +1621,14 @@ void main(void) {
         for(let drawable of this.drawables){
 
             let worldMat = mat4.create();
-            mat4.identity(worldMat);
             this.draw(drawable, worldMat, viewMat, projMat);
         }
 
         if(this.drawScenelistener != null){
-            this.drawScenelistener.afterDraw();
+            let projViewMat = mat4.create();
+            mat4.multiply(projViewMat, projMat, viewMat);
+
+            this.drawScenelistener.afterDraw(projViewMat);
         }
 
         // 次の再描画でdrawSceneが呼ばれるようにする。
