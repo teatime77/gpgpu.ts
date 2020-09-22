@@ -5,6 +5,7 @@ declare namespace mat4 {
     function translate(out: Float32Array, a: Float32Array, v: [number, number, number]) : void;
     function rotateX(out : Float32Array, a : Float32Array, rad : number) : Float32Array;
     function rotateY(out : Float32Array, a : Float32Array, rad : number) : Float32Array;
+    function rotateZ(out : Float32Array, a : Float32Array, rad : number) : Float32Array;
     function scale(out : Float32Array, a : Float32Array, v : [number, number, number]) : Float32Array;
     function multiply(out : Float32Array, a : Float32Array, b : Float32Array) : Float32Array;
     function perspective(out : Float32Array, fovy : number, aspect : number, near : number, far : number) : Float32Array;
@@ -521,13 +522,15 @@ class BindArg{
 export class DrawParam{
     xRot : number;
     yRot : number;
+    zRot : number;
     x    : number;
     y    : number;
     z    : number;
 
-    constructor(xrot: number, yrot: number, x: number, y: number, z: number){
+    constructor(xrot: number, yrot: number, zrot: number, x: number, y: number, z: number){
         this.xRot = xrot;
         this.yRot = yrot;
+        this.zRot = zrot;
         this.x = x;
         this.y = y;
         this.z = z;
@@ -780,7 +783,7 @@ void main(void) {
     TEXTUREs: number[];
     packages: Package[] = [];
     drawables: AbsDrawable[] = [];
-    drawParam: DrawParam = new DrawParam(0, 0, 0, 0, -5.0);
+    drawParam: DrawParam = new DrawParam(0, 0, 0, 0, 0, -5.0);
     ui3D : UI3D;
     drawScenelistener : DrawScenelistener | null = null;
 
@@ -1610,6 +1613,7 @@ void main(void) {
 
         mat4.rotateX(viewMat, viewMat, this.drawParam.xRot);
         mat4.rotateY(viewMat, viewMat, this.drawParam.yRot);
+        mat4.rotateZ(viewMat, viewMat, this.drawParam.zRot);
 
         let projMat = mat4.create();
         mat4.perspective(projMat, 45 * Math.PI / 180, this.canvas.offsetWidth / this.canvas.offsetHeight, 0.1, 1000.0);
