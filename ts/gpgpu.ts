@@ -42,8 +42,7 @@ export function chk() {
         let sts = gl.getError();
         if(sts != gl.NO_ERROR){
     
-            console.log(`chk:${sts.toString(16)}`);
-            console.assert(false);
+            assert(false, `chk:${sts.toString(16)}`);
         }
     }
 }
@@ -245,7 +244,7 @@ export class Package extends AbsDrawable{
         if(obj != undefined){
             Object.assign(this, obj);
         }
-        console.assert(this.mode != undefined);
+        assert(this.mode != undefined);
 
         if(this.id == undefined){
             this.id = `${this.constructor.name}_${Package.count++}`;
@@ -446,9 +445,9 @@ export class TextureInfo {
         TextureInfoのコンストラクタ
     */
     constructor(texel_type: string | null, shape: number[] | null, value: TextureValue | undefined = undefined) {
-        console.assert(texel_type != null || value != undefined && !(value instanceof Float32Array));
+        assert(texel_type != null || value != undefined && !(value instanceof Float32Array));
         if(shape != null){
-            console.assert(shape.length == 2 || shape.length == 3);
+            assert(shape.length == 2 || shape.length == 3);
         }
 
         if(value == undefined){
@@ -496,16 +495,16 @@ class BindArg{
 
     constructor(outName   : string, inName   : string, outPackage: Package, inPackage: Package){
         let out_val = outPackage.args[outName] as Float32Array;
-        console.assert(out_val instanceof Float32Array);
+        assert(out_val instanceof Float32Array);
         let inArg = inPackage.args[inName];
 
         if(inArg instanceof Float32Array){
 
-            console.assert(out_val.length == inArg.length);
+            assert(out_val.length == inArg.length);
         }
         else if(inArg instanceof TextureInfo && inArg.value instanceof Float32Array){
 
-            console.assert(out_val.length == inArg.value.length);
+            assert(out_val.length == inArg.value.length);
         }
         else{
             throw new Error();
@@ -1098,7 +1097,7 @@ void main(void) {
                 pkg.numInput = elemen_count;
             }
             else{
-                console.assert(pkg.numInput == elemen_count);
+                assert(pkg.numInput == elemen_count);
             }
 
             // バッファを作る。
@@ -1114,7 +1113,7 @@ void main(void) {
             gl.bindAttribLocation(pkg.program!, attrib.AttribLoc, attrib.name);
         }
 
-        console.assert(pkg.numInput != undefined);
+        assert(pkg.numInput != undefined);
     }
 
     /*
@@ -1505,7 +1504,7 @@ void main(void) {
                     }
                     else if(in_val instanceof TextureInfo){
 
-                        console.assert(in_val.value instanceof Float32Array && in_val.value.length == out_val.length);
+                        assert(in_val.value instanceof Float32Array && in_val.value.length == out_val.length);
                         in_val.value = out_val.slice();
                         in_val.dirty = true;
                     }
@@ -1595,7 +1594,8 @@ void main(void) {
             return;
         }
 
-        gl.clearColor(1, 248/255, 220/255, 1); chk();   // cornsilk
+        // gl.clearColor(1, 248/255, 220/255, 1); chk();   // cornsilk
+        gl.clearColor(0, 0, 0, 1); chk();   // cornsilk
         gl.clearDepth(1.0); chk();                      // Clear everything
         
         gl.enable(gl.DEPTH_TEST); chk();                // Enable depth testing
