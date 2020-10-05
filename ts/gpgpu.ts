@@ -811,7 +811,7 @@ void main(void) {
         this.canvas = canvas;
 
         // canvasからWebGL2のcontextを得る。
-        gl = canvas.getContext('webgl2', { antialias: false }) as WebGL2RenderingContext;
+        gl = canvas.getContext('webgl2', { antialias: true }) as WebGL2RenderingContext;
         var isWebGL2 = !!gl;
         if (!isWebGL2) {
             // WebGL2のcontextを得られない場合
