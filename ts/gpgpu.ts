@@ -525,14 +525,16 @@ export class DrawParam{
     x    : number;
     y    : number;
     z    : number;
+    fovy : number;
 
-    constructor(xrot: number, yrot: number, zrot: number, x: number, y: number, z: number){
+    constructor(xrot: number, yrot: number, zrot: number, x: number, y: number, z: number, fovy: number = 45){
         this.xRot = xrot;
         this.yRot = yrot;
         this.zRot = zrot;
         this.x = x;
         this.y = y;
         this.z = z;
+        this.fovy = fovy;
     }
 }
 
@@ -1616,7 +1618,7 @@ void main(void) {
         mat4.rotateZ(viewMat, viewMat, this.drawParam.zRot);
 
         let projMat = mat4.create();
-        mat4.perspective(projMat, 45 * Math.PI / 180, this.canvas.offsetWidth / this.canvas.offsetHeight, 0.1, 1000.0);
+        mat4.perspective(projMat, this.drawParam.fovy * Math.PI / 180, this.canvas.offsetWidth / this.canvas.offsetHeight, 0.1, 1000.0);
 
         if(this.drawScenelistener != null){
             this.drawScenelistener.beforeDraw();
